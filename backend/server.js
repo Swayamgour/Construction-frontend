@@ -6,6 +6,8 @@ import cors from "cors";
 import connectDB from "./config/db.js";
 
 // routes import
+
+
 import authRoutes from "./routes/authRoutes.js";
 import projectRoutes from "./routes/projectRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
