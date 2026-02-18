@@ -57,10 +57,7 @@ app.use("/api/assignments", assignmentRoutes);
 app.use("/api/gantt", ganttRoutes);
 // app.use("/api/", consumptionRoutes);
 
-// Fixed the root route - you can't use JSX in Express
-app.get("/", (req, res) => {
-    res.send("<h1>Hello World!</h1>");
-});
+
 
 // Alternatively, you can send JSON
 app.get("/api", (req, res) => {
