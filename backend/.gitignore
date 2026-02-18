@@ -1,0 +1,72 @@
+# ─────────────── Node Modules ───────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─────────────── Environment Files ───────────────
+.env
+.env.local
+.env.*.local
+*.env
+
+# ─────────────── Build Output ───────────────
+dist/
+build/
+.cache/
+.next/
+out/
+coverage/
+
+# ─────────────── Logs ───────────────
+logs/
+*.log
+*.log.*
+debug.log
+lerna-debug.log
+
+# ─────────────── OS Files ───────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ─────────────── Temporary Files ───────────────
+*.tmp
+*.temp
+*.swp
+*.swo
+*.pid
+*.seed
+*.pid.lock
+
+# ─────────────── Editor Config ───────────────
+.vscode/
+.idea/
+*.iml
+
+# ─────────────── Cache Files ───────────────
+.cache/
+npm-cache/
+yarn-cache/
+.pnp/
+.pnp.js
+
+# ─────────────── Uploads / Public Assets ───────────────
+uploads/
+public/uploads/
+public/temp/
+temp/
+
+# ─────────────── TypeScript Build ───────────────
+*.tsbuildinfo
+
+# ─────────────── Firebase / Expo / React Native ───────────────
+.expo/
+.expo-shared/
+android/
+ios/
+
+# ─────────────── Misc ───────────────
+*.orig
+*.rej
+*.map

@@ -1,0 +1,115 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+.signupContainer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: linear-gradient(135deg, #004e92, #000428);
+    font-family: "Poppins", sans-serif;
+}
+
+.signupCard {
+    background: #fff;
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    width: 380px;
+    text-align: center;
+}
+
+.signupTitle {
+    font-size: 24px;
+    color: #004e92;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.signupSubtitle {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 25px;
+}
+
+.formGroup {
+    text-align: left;
+    margin-bottom: 20px;
+}
+
+.formGroup label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 6px;
+    display: block;
+}
+
+.formGroup input,
+.formGroup select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    outline: none;
+    font-size: 14px;
+    transition: 0.3s;
+    box-sizing: border-box;
+}
+
+.formGroup input:focus,
+.formGroup select:focus {
+    border-color: #004e92;
+    box-shadow: 0 0 5px rgba(0, 78, 146, 0.3);
+}
+
+.signupBtn {
+    width: 100%;
+    background: #004e92;
+    color: #fff;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.signupBtn:hover {
+    background: #00356a;
+}
+
+.signupFooter {
+    margin-top: 20px;
+    font-size: 13px;
+    color: #555;
+}
+
+.signupFooter button {
+    color: #004e92;
+    font-weight: 500;
+    text-decoration: none;
+    border: none;
+    background-color: transparent;
+}
+
+.signupFooter button:hover {
+    text-decoration: underline;
+}
+
+.login_footer {
+    margin-top: 20px;
+    font-size: 12px;
+    color: #aaa;
+}

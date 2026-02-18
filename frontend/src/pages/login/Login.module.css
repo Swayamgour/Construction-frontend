@@ -1,0 +1,138 @@
+.login_container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: linear-gradient(135deg, #004e92, #000428);
+  font-family: "Poppins", sans-serif;
+}
+
+.login_card {
+  background: #fff;
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  width: 360px;
+  text-align: center;
+}
+
+.login_title {
+  font-size: 24px;
+  color: #004e92;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.login_subtitle {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 25px;
+}
+
+.form_group {
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.form_group label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.form_group input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  outline: none;
+  font-size: 14px;
+  transition: 0.3s;
+  box-sizing: border-box;
+}
+
+.form_group input:focus {
+  border-color: #004e92;
+  box-shadow: 0 0 5px rgba(0, 78, 146, 0.3);
+}
+
+.login_btn {
+  width: 100%;
+  background: #004e92;
+  color: #fff;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.login_btn:hover {
+  background: #00356a;
+}
+
+.login_footer {
+  margin-top: 20px;
+  font-size: 12px;
+  color: #aaa;
+}
+
+
+.signupBtn {
+  width: 100%;
+  background: #004e92;
+  color: #fff;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.signupBtn:hover {
+  background: #00356a;
+}
+
+.signupFooter {
+  margin-top: 20px;
+  font-size: 13px;
+  color: #555;
+}
+
+.signupFooter button {
+  color: #004e92;
+  font-weight: 500;
+  text-decoration: none;
+  border: none;
+  background-color: transparent;
+}
+
+.signupFooter button:hover {
+  text-decoration: underline;
+}
+
+.password_input_container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.eye_btn {
+  position: absolute;
+  right: 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  color: #555;
+}
+
+.eye_btn:hover {
+  color: #000;
+}
