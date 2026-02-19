@@ -150,9 +150,9 @@ const Dashboard = () => {
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Timeline
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  {/* <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Progress
-                  </th>
+                  </th> */}
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Status
                   </th>
@@ -218,7 +218,7 @@ const Dashboard = () => {
                       </td>
 
                       {/* Progress */}
-                      <td className="px-6 py-4">
+                      {/* <td className="px-6 py-4">
                         <div className="space-y-2">
                           <div className="flex justify-between items-center">
                             <span className="text-sm font-semibold text-gray-700">Progress</span>
@@ -235,7 +235,7 @@ const Dashboard = () => {
                             ></div>
                           </div>
                         </div>
-                      </td>
+                      </td> */}
 
                       {/* Status */}
                       <td className="px-6 py-4">

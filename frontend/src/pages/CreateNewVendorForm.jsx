@@ -73,7 +73,7 @@ const CreateNewVendorForm = () => {
 
     });
 
-    
+
 
     // ✅ If editing, preload the formData with vendor data
     useEffect(() => {
@@ -432,6 +432,8 @@ const CreateNewVendorForm = () => {
             }
         }
 
+        console.log('if')
+
         setErrors((prev) => ({ ...prev, ...allErrors }));
         setTouched((prev) => ({
             ...prev,
@@ -466,7 +468,7 @@ const CreateNewVendorForm = () => {
 
                 // Handle file uploads
                 const isFileField = [
-                    'companyLogo',
+                    // 'companyLogo',
                     'aadhaarCardFile',
                     'panCardFile'
                 ].includes(key);

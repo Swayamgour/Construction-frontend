@@ -314,6 +314,8 @@ export const getLabours = async (req, res) => {
 
 
 
+
+
 export const getLaboursById = async (req, res) => {
     try {
         const { id } = req.params;
@@ -322,33 +324,29 @@ export const getLaboursById = async (req, res) => {
             return res.status(400).json({ message: "labourId required" });
         }
 
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: "Invalid labourId" });
+        }
+
         const labourObjId = new mongoose.Types.ObjectId(id);
 
         const labour = await Labour.aggregate([
             {
-                // 🔥 Filter only 1 labour
                 $match: { _id: labourObjId }
             },
 
+            // 🔥 Attendance Lookup
             {
-                // 🔥 Get attendance history for this ONE labour
                 $lookup: {
                     from: "attendances",
-
                     let: { labourObjId: labourObjId },
-
                     pipeline: [
                         {
                             $match: {
                                 $expr: {
                                     $or: [
-                                        // Case 1 — attendance.labourId is ObjectId
                                         { $eq: ["$labourId", "$$labourObjId"] },
-
-                                        // Case 2 — attendance.labourId stored as string
                                         { $eq: ["$labourId", { $toString: "$$labourObjId" }] },
-
-                                        // Case 3 — attendance.labourId convert string → ObjectId
                                         {
                                             $eq: [
                                                 { $toObjectId: "$labourId" },
@@ -359,17 +357,22 @@ export const getLaboursById = async (req, res) => {
                                 }
                             }
                         },
-
-                        { $project: { status: 1, date: 1, projectId: 1, _id: 0 } },
+                        {
+                            $project: {
+                                status: 1,
+                                date: 1,
+                                projectId: 1,
+                                _id: 0
+                            }
+                        },
                         { $sort: { date: -1 } }
                     ],
-
                     as: "attendanceHistory"
                 }
             },
 
+            // 🔥 Project Lookup
             {
-                // 🔥 Get assigned project details
                 $lookup: {
                     from: "projects",
                     localField: "assignedProjects",
@@ -378,8 +381,44 @@ export const getLaboursById = async (req, res) => {
                 }
             },
 
+            // 🔥 Calculate Attendance Stats
             {
-                // 🔥 Final returned fields
+                $addFields: {
+                    totalPresentDays: {
+                        $size: {
+                            $filter: {
+                                input: "$attendanceHistory",
+                                as: "att",
+                                cond: { $eq: ["$$att.status", "Present"] }
+                            }
+                        }
+                    },
+                    totalAbsentDays: {
+                        $size: {
+                            $filter: {
+                                input: "$attendanceHistory",
+                                as: "att",
+                                cond: { $eq: ["$$att.status", "Absent"] }
+                            }
+                        }
+                    },
+                    totalHalfDays: {
+                        $size: {
+                            $filter: {
+                                input: "$attendanceHistory",
+                                as: "att",
+                                cond: { $eq: ["$$att.status", "Half Day"] }
+                            }
+                        }
+                    },
+                    totalAttendanceDays: {
+                        $size: "$attendanceHistory"
+                    }
+                }
+            },
+
+            // 🔥 Final Response Fields
+            {
                 $project: {
                     name: 1,
                     phone: 1,
@@ -398,17 +437,73 @@ export const getLaboursById = async (req, res) => {
                         projectName: 1
                     },
 
-                    attendanceHistory: 1
+                    attendanceHistory: 1,
+
+                    totalPresentDays: 1,
+                    totalAbsentDays: 1,
+                    totalHalfDays: 1,
+                    totalAttendanceDays: 1
                 }
             }
         ]);
 
-        return res.status(200).json(labour[0]);  // Only one
+        if (!labour.length) {
+            return res.status(404).json({ message: "Labour not found" });
+        }
+
+        return res.status(200).json(labour[0]);
 
     } catch (err) {
         return res.status(500).json({
             message: "Error fetching labour details",
             error: err.message
+        });
+    }
+};
+
+
+
+export const deleteUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                message: "User ID required"
+            });
+        }
+
+        // User find karo
+        const user = await User.findById(id);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        // 🔥 Safety check — sirf manager ya supervisor delete ho
+        if (user.role !== "manager" && user.role !== "supervisor") {
+            return res.status(403).json({
+                success: false,
+                message: "You can only delete manager or supervisor"
+            });
+        }
+
+        await User.findByIdAndDelete(id);
+
+        return res.status(200).json({
+            success: true,
+            message: `${user.role} deleted successfully`
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Error deleting user",
+            error: error.message
         });
     }
 };

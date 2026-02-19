@@ -34,7 +34,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, data }) => {
     { name: "Assign Task", icon: <ClipboardList size={20} />, path: "/TaskList", roles: ["admin", "manager"] },
     // { name: "Machine Manage", icon: <Factory size={20} />, path: "/MachineManageMent", roles: ["admin"] },
     { name: "Material Approval", icon: <BarChart2 size={20} />, path: "/MaterialApproval", roles: ["admin"] },
-    { name: "My Task", icon: <ClipboardList size={20} />, path: "/MyTasks", roles: ["supervisor", "manager"] },
+    // { name: "My Task", icon: <ClipboardList size={20} />, path: "/MyTasks", roles: ["supervisor", "manager"] },
     { name: "Machine", icon: <Factory size={20} />, path: "/machine/list", roles: ["admin", "manager", "supervisor"] },
 
     // { name: "Punch In", icon: <ClipboardList size={20} />, path: "/employee/punch-in", roles: ["manager", "supervisor"] },

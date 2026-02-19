@@ -263,7 +263,7 @@ function UserList() {
                         </div>
 
                         <div className="flex flex-col sm:flex-row gap-4">
-                            <div>
+                            {/* <div>
                                 <label className="text-sm font-semibold text-slate-700 mb-2 block">Filter by Role</label>
                                 <select
                                     value={selectedRole}
@@ -274,7 +274,7 @@ function UserList() {
                                         <option key={role} value={role}>{role}</option>
                                     ))}
                                 </select>
-                            </div>
+                            </div> */}
 
                             <div>
                                 <label className="text-sm font-semibold text-slate-700 mb-2 block">Filter by Status</label>

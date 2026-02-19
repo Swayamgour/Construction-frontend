@@ -8,7 +8,8 @@ import {
     getManagerDetails,
     getLabours,
     getLaboursById,
-    updateUserStatus
+    updateUserStatus,
+    deleteUser
 } from "../controllers/authController.js";
 
 // import { registerUser } from "../controllers/authController.js";
@@ -125,6 +126,14 @@ router.get(
             });
         }
     }
+);
+
+router.delete(
+    "/delete-user/:id",
+    auth,
+    roleCheck("admin"), // 🔥 Only admin can delete
+    deleteUser
+
 );
 
 

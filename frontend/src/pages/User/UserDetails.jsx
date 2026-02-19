@@ -10,10 +10,12 @@ import {
     Download,
     Send,
     Lock,
-    User
+    User,
+    Trash2
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useGetUsersByIdQuery } from '../../Reduxe/Api';
+import { useDeleteUserMutation, useGetUsersByIdQuery } from '../../Reduxe/Api';
+import toast from 'react-hot-toast';
 
 const defaultAvatar = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face";
 
@@ -21,6 +23,8 @@ function UserDetails() {
     const navigate = useNavigate();
     const location = useLocation();
     const { userId } = location.state || {};
+
+    const [deleteUser, { isLoading: isDeleting }] = useDeleteUserMutation();
 
     const [activeTab, setActiveTab] = useState('overview');
     const [showActionsMenu, setShowActionsMenu] = useState(false);
@@ -54,6 +58,17 @@ function UserDetails() {
     const handleBack = () => {
         navigate(-1);
     };
+
+    const handleDelete = (user) => {
+        console.log(user?._id)
+        if (window.confirm(`Are you sure you want to delete ${user.name}?`)) {
+            deleteUser(user._id);
+            navigate(-1);
+            toast.success('User deleted successfully');
+        }
+        // setActiveActions(null);
+    };
+
 
     if (isLoading) {
         return (
@@ -106,7 +121,17 @@ function UserDetails() {
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="border-t border-slate-200">
+                            <button
+                                onClick={() => handleDelete(user)}
+                                className="w-full text-left px-4 py-3 bg-red-600  transition-colors duration-150 flex items-center gap-3 text-white"
+                            >
+                                <Trash2 size={16} />
+                                Delete User
+                            </button>
+                        </div>
+
+                        {/* <div className="flex items-center gap-3">
                             <button className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl">
                                 <Edit size={18} />
                                 Edit
@@ -128,7 +153,7 @@ function UserDetails() {
                                     </div>
                                 )}
                             </div>
-                        </div>
+                        </div> */}
                     </div>
                 </div>
 

@@ -240,9 +240,9 @@ const AssignProject = () => {
                                     <th className="px-6 py-5 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
                                         Timeline
                                     </th>
-                                    <th className="px-6 py-5 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
+                                    {/* <th className="px-6 py-5 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
                                         Progress
-                                    </th>
+                                    </th> */}
                                     <th className="px-6 py-5 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
                                         Status
                                     </th>
@@ -313,7 +313,7 @@ const AssignProject = () => {
                                             </td>
 
                                             {/* Progress */}
-                                            <td className="px-6 py-5">
+                                            {/* <td className="px-6 py-5">
                                                 <div className="space-y-3">
                                                     <div className="flex justify-between items-center">
                                                         <span className="text-sm font-bold text-gray-700">Completion</span>
@@ -334,7 +334,7 @@ const AssignProject = () => {
                                                         {progressValue < 100 ? `${100 - progressValue}% remaining` : "Completed!"}
                                                     </div>
                                                 </div>
-                                            </td>
+                                            </td> */}
 
                                             {/* Status */}
                                             <td className="px-6 py-5">
@@ -397,7 +397,7 @@ const AssignProject = () => {
                         </table>
 
                         {/* Empty State */}
-                        {(!filteredProjects || filteredProjects.length === 0) && (
+                        {/* {(!filteredProjects || filteredProjects.length === 0) && (
                             <div className="text-center py-16">
                                 <div className="w-32 h-32 mx-auto mb-6 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center shadow-lg">
                                     <FaRocket className="text-gray-400 text-4xl" />
@@ -418,7 +418,7 @@ const AssignProject = () => {
                                     Create Your First Project
                                 </button>
                             </div>
-                        )}
+                        )} */}
                     </div>
                 </div>
             </div>

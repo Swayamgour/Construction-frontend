@@ -33,13 +33,6 @@ const LabourDetail = () => {
   const { data, isLoading, isError } = useGetLabourByIdQuery(id);
 
   // Mock attendance data - replace with actual API data
-  const attendanceData = [
-    { date: "2024-01-15", punchIn: "08:00 AM", punchOut: "05:00 PM", status: "Present", hours: 9, project: "Site A" },
-    { date: "2024-01-14", punchIn: "08:15 AM", punchOut: "05:30 PM", status: "Present", hours: 9.25, project: "Site B" },
-    { date: "2024-01-13", punchIn: "-", punchOut: "-", status: "Absent", hours: 0, project: "-" },
-    { date: "2024-01-12", punchIn: "09:00 AM", punchOut: "06:00 PM", status: "Present", hours: 9, project: "Site A" },
-    { date: "2024-01-11", punchIn: "08:30 AM", punchOut: "04:45 PM", status: "Half Day", hours: 8.25, project: "Site C" },
-  ];
 
   const labour = data;
 
@@ -140,12 +133,12 @@ const LabourDetail = () => {
 
             {/* ✏️ Action Buttons */}
             <div className="flex gap-3">
-              <button
+              {/* <button
                 onClick={() => setIsEditing(true)}
                 className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl flex items-center gap-2 transition-all duration-200 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40"
               >
                 <Edit size={18} /> Edit Profile
-              </button>
+              </button> */}
 
               <button className="px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl flex items-center gap-2 transition-all duration-200 shadow-lg shadow-red-500/25 hover:shadow-red-500/40">
                 <Trash2 size={18} /> Delete
@@ -177,16 +170,7 @@ const LabourDetail = () => {
               <Clock className="w-4 h-4 inline mr-2" />
               Attendance
             </button>
-            {/* <button
-              onClick={() => setActiveTab("performance")}
-              className={`flex-1 py-4 px-6 text-center font-medium transition-all duration-200 ${activeTab === "performance"
-                  ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50/50"
-                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                }`}
-            >
-              <TrendingUp className="w-4 h-4 inline mr-2" />
-              Performance
-            </button> */}
+
           </div>
 
           {/* Tab Content */}
@@ -280,119 +264,48 @@ const LabourDetail = () => {
             )}
 
             {activeTab === "attendance" && (
-              <div className="space-y-6">
-                {/* 📈 Attendance Summary */}
+              <>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+
+                  {/* ✅ Present */}
                   <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-2xl border border-green-200">
                     <p className="text-sm text-green-600 font-medium">Present</p>
-                    <p className="text-2xl font-bold text-green-700">18</p>
-                    <p className="text-xs text-green-600">This Month</p>
+                    <p className="text-2xl font-bold text-green-700">
+                      {labour?.totalPresentDays || 0}
+                    </p>
+                    <p className="text-xs text-green-600">Total Days</p>
                   </div>
+
+                  {/* ❌ Absent */}
                   <div className="bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-2xl border border-red-200">
                     <p className="text-sm text-red-600 font-medium">Absent</p>
-                    <p className="text-2xl font-bold text-red-700">2</p>
-                    <p className="text-xs text-red-600">This Month</p>
+                    <p className="text-2xl font-bold text-red-700">
+                      {labour?.totalAbsentDays || 0}
+                    </p>
+                    <p className="text-xs text-red-600">Total Days</p>
                   </div>
+
+                  {/* 🟠 Half Day */}
                   <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-2xl border border-orange-200">
                     <p className="text-sm text-orange-600 font-medium">Half Days</p>
-                    <p className="text-2xl font-bold text-orange-700">1</p>
-                    <p className="text-xs text-orange-600">This Month</p>
+                    <p className="text-2xl font-bold text-orange-700">
+                      {labour?.totalHalfDays || 0}
+                    </p>
+                    <p className="text-xs text-orange-600">Total Days</p>
                   </div>
+
+                  {/* 📊 Total Records */}
                   <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-2xl border border-blue-200">
-                    <p className="text-sm text-blue-600 font-medium">Avg. Hours</p>
-                    <p className="text-2xl font-bold text-blue-700">8.5</p>
-                    <p className="text-xs text-blue-600">Daily Average</p>
+                    <p className="text-sm text-blue-600 font-medium">Total Records</p>
+                    <p className="text-2xl font-bold text-blue-700">
+                      {labour?.totalAttendanceDays || 0}
+                    </p>
+                    <p className="text-xs text-blue-600">Attendance Entries</p>
                   </div>
-                </div>
-
-                {/* 🎛️ Attendance Controls */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                  {/* <div className="flex gap-3">
-                    <button className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl flex items-center gap-2 transition-all duration-200">
-                      <PlayCircle className="w-4 h-4" />
-                      Punch In
-                    </button>
-                    <button className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl flex items-center gap-2 transition-all duration-200">
-                      <Square className="w-4 h-4" />
-                      Punch Out
-                    </button>
-                  </div> */}
-
-                  <div className="flex gap-3 md:w-auto w-full flex-wrap">
-                    <div className="relative">
-                      <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Search dates..."
-                        className="pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                    <button className="px-4 py-2 border border-gray-300 rounded-xl flex items-center gap-2 hover:bg-gray-50 transition-all duration-200">
-                      <Filter className="w-4 h-4" />
-                      Filter
-                    </button>
-                    <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center gap-2 transition-all duration-200">
-                      <Download className="w-4 h-4" />
-                      Export
-                    </button>
-                  </div>
-                </div>
-
-                {/* 📋 Attendance Table */}
-                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-                  <tbody>
-                    {labour.attendanceHistory?.length > 0 ? (
-                      labour.attendanceHistory.map((record, index) => (
-                        <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-
-                          {/* 📅 Date */}
-                          <td className="p-4 font-medium text-gray-800">
-                            {new Date(record.date).toLocaleDateString("en-US", {
-                              weekday: "short",
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
-                          </td>
-
-                          {/* 🏗 Project Name */}
-                          <td className="p-4">
-                            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                              {labour.assignedProjects?.find(p => p._id === record.projectId)?.projectName || "N/A"}
-                            </span>
-                          </td>
-
-                          {/* ⏱ Punch In (Not Available) */}
-                          <td className="p-4 font-medium">-</td>
-
-                          {/* ⏱ Punch Out (Not Available) */}
-                          <td className="p-4 font-medium">-</td>
-
-                          {/* ⏳ Hours (Not Available) */}
-                          <td className="p-4">
-                            <span className="font-bold text-gray-500"> - </span>
-                          </td>
-
-                          {/* ✔ Status */}
-                          <td className="p-4">
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(record.status)}`}>
-                              {record.status}
-                            </span>
-                          </td>
-
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={6} className="p-4 text-center text-gray-500">
-                          No attendance records found
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
 
                 </div>
-              </div>
+
+              </>
             )}
 
             {activeTab === "performance" && (
@@ -425,7 +338,7 @@ const LabourDetail = () => {
                 })}
               </p>
             </div>
-            <div className="p-4 bg-gray-50 rounded-xl">
+            {/* <div className="p-4 bg-gray-50 rounded-xl">
               <p className="text-sm text-gray-500 mb-1">Updated At</p>
               <p className="font-medium text-gray-800">
                 {new Date(labour.updatedAt).toLocaleDateString('en-US', {
@@ -434,7 +347,7 @@ const LabourDetail = () => {
                   day: 'numeric'
                 })}
               </p>
-            </div>
+            </div> */}
             <div className="p-4 bg-gray-50 rounded-xl">
               <p className="text-sm text-gray-500 mb-1">Labour ID</p>
               <p className="font-medium text-gray-800 text-sm font-mono">{labour._id}</p>

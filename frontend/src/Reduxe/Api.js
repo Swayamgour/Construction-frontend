@@ -5,7 +5,8 @@ export const Api = createApi({
 
     baseQuery: fetchBaseQuery({
 
-        baseUrl: "http://localhost:5000/api/",
+        // baseUrl: "https://backendapi.ssconstructionsup.in/api/",
+        baseUrl: "http://localhost:5002/api/",
         // baseUrl: "https://backendcreatech.onrender.com/api/",
         // baseUrl: "https://ss-construction-1gf5.onrender.com/api/",
 
@@ -119,6 +120,14 @@ export const Api = createApi({
         getRoles: build.query({
             query: () => `auth/managers-supervisors`,
             providesTags: ["Roles"],
+        }),
+
+        deleteUser: build.mutation({
+            query: (id) => ({
+                url: `auth/delete-user/${id}`,
+                method: "DELETE",
+            }),
+            invalidatesTags: ["User"],
         }),
 
         updateRoles: build.mutation({
@@ -1303,6 +1312,8 @@ export const {
     useUpdateTaskPriorityMutation,
     useUpdateTaskDependenciesMutation,
     useDeleteTaskMutation,
+
+    useDeleteUserMutation
 
     // useAddUserMutation,
     // useGetRolesQuery,
