@@ -1,23 +1,36 @@
 import React, { useState } from "react";
 import { useParams } from "react-router-dom";
 import {
-    useGetEmployeeByIdQuery,
-    useMarkEmployeeAttendanceMutation
-} from "../../Redux/Api";
+    useGetEmployeeListQuery,
+    usePunchInMutation
+} from "../../Reduxe/Api";
 
+/**
+ * NOTE: this page is not currently routed in App.js.
+ * Fixed anyway: import path was pointing at a non-existent "../../Redux/Api"
+ * folder (should be "Reduxe"), and it called useGetEmployeeByIdQuery /
+ * useMarkEmployeeAttendanceMutation, neither of which exist on the backend
+ * (no single-employee-by-id route, and attendance marking is
+ * POST /api/attendance/employee/mark via punchIn). Both are now wired to
+ * real endpoints.
+ */
 export default function MarkEmployeeAttendance() {
     const { employeeId } = useParams();
-    const { data } = useGetEmployeeByIdQuery(employeeId);
-    const [markAttendance] = useMarkEmployeeAttendanceMutation();
+    const { data: employeeList } = useGetEmployeeListQuery();
+    const [markAttendance, { isLoading }] = usePunchInMutation();
 
     const [status, setStatus] = useState("Present");
     const [timeIn, setTimeIn] = useState(new Date().toLocaleTimeString());
     const [timeOut, setTimeOut] = useState("");
     const [workHours, setWorkHours] = useState("");
 
+    const emp = (employeeList?.data || employeeList || []).find(
+        (e) => String(e._id) === String(employeeId)
+    );
+
     const handleSubmit = async () => {
         try {
-            const res = await markAttendance({
+            await markAttendance({
                 employeeId,
                 status,
                 timeIn,
@@ -27,11 +40,9 @@ export default function MarkEmployeeAttendance() {
 
             alert("Attendance marked!");
         } catch (err) {
-            alert(err?.data?.message);
+            alert(err?.data?.message || "Error marking attendance");
         }
     };
-
-    const emp = data?.employee;
 
     return (
         <div className="p-5 max-w-xl mx-auto">
@@ -84,9 +95,10 @@ export default function MarkEmployeeAttendance() {
 
                 <button
                     onClick={handleSubmit}
-                    className="mt-5 w-full bg-blue-600 text-white py-2 rounded-lg"
+                    disabled={isLoading}
+                    className="mt-5 w-full bg-blue-600 text-white py-2 rounded-lg disabled:opacity-60"
                 >
-                    Submit Attendance
+                    {isLoading ? "Submitting..." : "Submit Attendance"}
                 </button>
             </div>
         </div>

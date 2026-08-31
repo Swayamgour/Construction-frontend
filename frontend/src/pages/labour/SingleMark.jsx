@@ -1,13 +1,13 @@
 import React, { useState } from "react";
 import {
   useGetLaboursByProjectQuery,
-  useMarkSingleLabourMutation
+  useAttendanceMarkMutation
 } from "../../Reduxe/Api";
 
 export default function SingleMark() {
   const projectId = localStorage.getItem("projectId");
   const { data } = useGetLaboursByProjectQuery(projectId);
-  const [markSingle] = useMarkSingleLabourMutation();
+  const [markSingle] = useAttendanceMarkMutation();
 
   const [selected, setSelected] = useState("");
   const [status, setStatus] = useState("Present");

@@ -65,11 +65,12 @@ export const getTasks = async (req, res) => {
         let filter = {};
 
         // =========== ROLE RESTRICTION ============
-        if (
-            req.user.role === "supervisor" ||
-            req.user.role === "engineer" ||
-            req.user.role === "storekeeper"
-        ) {
+        // 🔒 FIX: pehle sirf supervisor/engineer/storekeeper hi apne tasks tak
+        // restricted the — baaki roles (labour, operator, accountant) ko
+        // koi filter na milne ki wajah se WOH SAARE PROJECTS KE SAARE TASKS
+        // dekh sakte the. Ab admin/manager ke alawa har role apne assigned
+        // tasks tak hi restricted hai.
+        if (req.user.role !== "admin" && req.user.role !== "manager") {
             filter.assignedTo = req.user.id; // only his tasks
         }
 

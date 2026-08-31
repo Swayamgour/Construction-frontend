@@ -87,6 +87,56 @@ export const addVendor = async (req, res) => {
 };
 
 
+/**
+ * PUT /api/vendor/:id
+ * Added to close a frontend gap — CreateNewVendorForm.jsx's edit mode
+ * called useUpdateVendorMutation against a route that never existed.
+ */
+export const updateVendor = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const vendor = await Vendor.findById(id);
+        if (!vendor) {
+            return res.status(404).json({ message: "Vendor not found" });
+        }
+
+        const editableFields = [
+            "companyName", "businessType", "website", "yearEstablished",
+            "contactPerson", "email", "phone", "alternatePhone", "address",
+            "city", "state", "pincode", "country", "gstNumber", "panNumber",
+            "accountHolderName", "bankName", "accountNumber", "ifscCode",
+            "branchName", "itemsSupplied",
+        ];
+
+        if (req.body.phone && req.body.phone !== vendor.phone) {
+            const exists = await Vendor.findOne({ phone: req.body.phone, _id: { $ne: id } });
+            if (exists) {
+                return res.status(409).json({ message: "Another vendor already uses this phone number" });
+            }
+        }
+
+        for (const field of editableFields) {
+            if (req.body[field] !== undefined) vendor[field] = req.body[field];
+        }
+
+        if (req.files?.aadhaarCardFile?.[0]) vendor.aadhaarCardFile = req.files.aadhaarCardFile[0].path;
+        if (req.files?.panCardFile?.[0]) vendor.panCardFile = req.files.panCardFile[0].path;
+
+        await vendor.save();
+
+        res.status(200).json({
+            message: "Vendor updated successfully",
+            vendor,
+        });
+    } catch (error) {
+        console.error("Vendor Update Error:", error);
+        res.status(500).json({
+            message: "Error updating vendor",
+            error: error.message,
+        });
+    }
+};
+
 export const getAllVendors = async (req, res) => {
     try {
         const vendors = await Vendor.find()

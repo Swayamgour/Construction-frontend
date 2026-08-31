@@ -6,7 +6,14 @@ const stockLedgerSchema = new mongoose.Schema({
 
     transactionType: {
         type: String,
-        enum: ["GRN", "ISSUE", "TRANSFER", "RETURN", "CONSUMPTION"],
+        // ⭐ Extended (additive only) for the new Stock Request / Transfer /
+        // Procurement / Inventory modules. Existing values are untouched so
+        // current GRN/consumption flows keep writing valid ledger rows.
+        enum: [
+            "GRN", "ISSUE", "TRANSFER", "RETURN", "CONSUMPTION",
+            "TRANSFER_IN", "TRANSFER_OUT", "PROCUREMENT_RECEIPT",
+            "OPENING", "DAMAGE", "ADJUSTMENT",
+        ],
         required: true
     },
 

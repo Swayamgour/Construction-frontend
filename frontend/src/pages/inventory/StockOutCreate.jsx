@@ -1,16 +1,16 @@
 import React, { useState } from "react";
 import { FiSave, FiArrowLeft } from "react-icons/fi";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAddStockMutation, useGetStockByIdQuery } from "../../Reduxe/Api";
+import { useReceiveMaterialMutation, useGetProjectStockQuery } from "../../Reduxe/Api";
 import toast from "react-hot-toast";
 
 const StockOutCreate = () => {
   const navigate = useNavigate();
-  const [addStock] = useAddStockMutation();
+  const [addStock] = useReceiveMaterialMutation();
   const location = useLocation();
   const selectedProjectId = location?.state?.selectedProjectId || null;
 
-  const { data: projectStockData = [] } = useGetStockByIdQuery(selectedProjectId, {
+  const { data: projectStockData = [] } = useGetProjectStockQuery(selectedProjectId, {
     skip: !selectedProjectId,
   });
 

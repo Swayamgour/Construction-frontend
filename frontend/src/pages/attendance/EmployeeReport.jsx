@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import { useGetEmployeeAttendanceByDateQuery } from "../../Redux/Api";
+import { useGetAttendanceByDateQuery } from "../../Reduxe/Api";
 
 export default function EmployeeReport() {
     const [date, setDate] = useState("");
-    const { data } = useGetEmployeeAttendanceByDateQuery({ date });
+    const { data } = useGetAttendanceByDateQuery({ date });
 
     return (
         <div className="p-4">

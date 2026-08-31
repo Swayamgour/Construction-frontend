@@ -59,6 +59,18 @@ import UserDetails from "./pages/User/UserDetails";
 import StockOverview from "./pages/inventory/StockOverview";
 import StockInCreate from "./pages/inventory/StockInCreate";
 import StockOutCreate from "./pages/stock/StockOutCreate";
+
+// ⭐ NEW MODULES — pages for the backend Feature Enhancement work
+// (Labour transfer/overtime, Stock Request workflow, Drawings,
+// Machinery request workflow, EOD, Project Delay). None of these had
+// any frontend before.
+import LabourTransfer from "./pages/labourManagement/LabourTransfer";
+import OvertimeManagement from "./pages/labourManagement/OvertimeManagement";
+import StockRequests from "./pages/stockRequests/StockRequests";
+import DrawingRequests from "./pages/drawings/DrawingRequests";
+import MachineRequests from "./pages/machineryRequests/MachineRequests";
+import EODReports from "./pages/eod/EODReports";
+import ProjectDelays from "./pages/delays/ProjectDelays";
 import LabourDashboard from "./pages/labour/LabourDashboard";
 import LabourDetail from "./pages/labour/LabourDetail";
 import StockItemHistory from "./pages/inventory/StockItemHistory";
@@ -942,6 +954,49 @@ function App() {
         <Route path="/DailyWorkReportForm" element={
           <Layout>
             <DailyWorkReportForm />
+          </Layout>
+        } />
+
+        {/* ⭐ NEW MODULE ROUTES */}
+        <Route path="/labour/transfer" element={
+          <Layout>
+            <LabourTransfer />
+          </Layout>
+        } />
+
+        <Route path="/labour/overtime" element={
+          <Layout>
+            <OvertimeManagement />
+          </Layout>
+        } />
+
+        <Route path="/stock/requests" element={
+          <Layout>
+            <StockRequests />
+          </Layout>
+        } />
+
+        <Route path="/drawings" element={
+          <Layout>
+            <DrawingRequests />
+          </Layout>
+        } />
+
+        <Route path="/machinery/requests" element={
+          <Layout>
+            <MachineRequests />
+          </Layout>
+        } />
+
+        <Route path="/eod-reports" element={
+          <Layout>
+            <EODReports />
+          </Layout>
+        } />
+
+        <Route path="/project-delays" element={
+          <Layout>
+            <ProjectDelays />
           </Layout>
         } />
 

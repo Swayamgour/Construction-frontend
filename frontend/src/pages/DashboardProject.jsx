@@ -19,7 +19,6 @@ export default function DashboardProject() {
     const projectById = location.state?.project || {};
     const { data: projectData } = useGetProjectsByIdQuery({ id: projectById._id });
 
-    const [progress, setProgress] = useState(16);
     const [activeTab, setActiveTab] = useState("overview");
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [selectManager, setSelectManager] = useState("");
@@ -46,6 +45,28 @@ export default function DashboardProject() {
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         return diffDays > 0 ? `${diffDays} days` : 'Overdue';
     };
+
+    // Real progress — uses a backend-provided percentage when available,
+    // otherwise derives it from elapsed time between start and expected
+    // completion. No more hardcoded placeholder value.
+    const getProgress = () => {
+        if (typeof projectData?.progress === 'number') {
+            return Math.min(100, Math.max(0, Math.round(projectData.progress)));
+        }
+        const start = projectData?.actualStartDate || projectData?.expectedStartDate;
+        const end = projectData?.expectedCompletionDate;
+        if (!start || !end) return 0;
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        const today = new Date();
+        if (projectData?.actualCompletionDate) return 100;
+        if (today <= startDate) return 0;
+        if (today >= endDate) return 100;
+        const total = endDate - startDate;
+        const elapsed = today - startDate;
+        return total > 0 ? Math.round((elapsed / total) * 100) : 0;
+    };
+    const progress = getProgress();
 
     const getProjectStatus = () => {
         if (!projectData?.actualStartDate) return 'Not Started';
@@ -141,8 +162,7 @@ export default function DashboardProject() {
             {/* Quick Actions */}
             <div className="bg-white rounded-3xl shadow-xl border p-6">
                 <h3 className="text-xl font-bold mb-4">Quick Actions</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {console.log(projectById)}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <ActionCard
                         title="View Tasks"
                         icon={<FaTasks />}
@@ -152,20 +172,8 @@ export default function DashboardProject() {
                     <ActionCard
                         title="Team Management"
                         icon={<FaUserTie />}
-                        onClick={() => {/* Navigate to team management */ }}
+                        onClick={() => setActiveTab("details")}
                         color="from-green-500 to-emerald-500"
-                    />
-                    <ActionCard
-                        title="Site Photos"
-                        icon={<FaBuilding />}
-                        onClick={() => {/* Navigate to photos */ }}
-                        color="from-purple-500 to-pink-500"
-                    />
-                    <ActionCard
-                        title="Documents"
-                        icon={<FaFileContract />}
-                        onClick={() => {/* Navigate to documents */ }}
-                        color="from-orange-500 to-red-500"
                     />
                 </div>
             </div>
@@ -250,20 +258,18 @@ export default function DashboardProject() {
                 <Tabs active={activeTab} setActive={setActiveTab} />
 
                 <div className="flex gap-4 flex-wrap">
-                    {/* {role !== 'manager' && ( */}
-                    {/* <Btn label="Assign Manager" onClick={() => { setSelectManager('manager'); toggleDrawer(); }} /> */}
-                    {/* )} */}
-
                     {projectData?.locationMapLink &&
                         <button onClick={() => shareLocation()} className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md hover:opacity-90 transition" >
                             Share Location
                         </button>
                     }
 
-                    {role !== 'manager' && (
+                    {/* Assign buttons — admin sees both, manager can only
+                        assign a supervisor, supervisor sees neither. */}
+                    {role === 'admin' && (
                         <Btn label="Assign Manager" onClick={() => { setSelectManager('manager'); toggleDrawer(); }} />
                     )}
-                    {role !== 'supervisor' && (
+                    {(role === 'admin' || role === 'manager') && (
                         <Btn label="Assign Supervisor" onClick={() => { setSelectManager('supervisor'); toggleDrawer(); }} />
                     )}
                 </div>

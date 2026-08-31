@@ -8,7 +8,9 @@ const userSchema = new mongoose.Schema({
 
     role: {
         type: String,
-        enum: ["admin", "manager", "supervisor", "labour", "operator"],
+        // ⭐ Added "drawing_manager" (additive) for the Drawing/Document
+        // request module — reviews requests and uploads drawing versions.
+        enum: ["admin", "manager", "supervisor", "storekeeper", "accountant", "operator", "labour", "drawing_manager"],
         default: "labour"
     },
 

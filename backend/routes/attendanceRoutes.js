@@ -92,6 +92,7 @@ router.get(
 router.post(
     "/employee/mark",
     auth,
+    roleCheck("admin", "manager", "supervisor", "storekeeper", "accountant", "operator"),
     upload.single("selfie"),
     markEmployeeAttendance
 );
@@ -144,7 +145,7 @@ router.get(
 router.post(
     "/employee/punch-out",
     auth,
-    roleCheck("employee", "admin", "manager", "supervisor"),
+    roleCheck("admin", "manager", "supervisor", "storekeeper", "accountant", "operator"),
     employeePunchOut
 );
 

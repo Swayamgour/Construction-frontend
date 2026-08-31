@@ -1,4 +1,3 @@
-// routes/reportRoutes.js
 import express from "express";
 import {
     submitDailyReport,
@@ -8,16 +7,17 @@ import {
     deleteDailyReport,
     approveDailyReport
 } from "../controllers/reportController.js";
-// import { auth } from "../middlewares/auth.js"; // assume exists
 import { auth } from "../middleware/auth.js";
+import { roleCheck } from "../middleware/role.js";
 
 const router = express.Router();
 
-router.post("/", auth, submitDailyReport);               // create
-router.get("/", auth, listDailyReports);                 // list + filters
+// Site level daily reports — submitted by supervisor/manager, approved by manager/admin.
+router.post("/", auth, roleCheck("admin", "manager", "supervisor"), submitDailyReport);
+router.get("/", auth, listDailyReports);                 // list + filters (controller auto-scopes supervisor to own reports)
 router.get("/:id", auth, getDailyReport);                // single
-router.put("/:id", auth, updateDailyReport);             // update
-router.delete("/:id", auth, deleteDailyReport);          // delete
-router.patch("/:id/approve", auth, approveDailyReport);  // approve/reject
+router.put("/:id", auth, updateDailyReport);              // controller checks ownership / admin+manager
+router.delete("/:id", auth, roleCheck("admin", "manager"), deleteDailyReport);
+router.patch("/:id/approve", auth, roleCheck("admin", "manager"), approveDailyReport);
 
 export default router;

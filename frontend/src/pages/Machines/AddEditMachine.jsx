@@ -2,42 +2,98 @@ import React, { useEffect, useState } from "react";
 import {
     useAddMachineMutation,
     useUpdateMachineMutation,
-    useGetMachineByIdQuery,
+    useGetMachineDetailsQuery,
 } from "../../Reduxe/Api";
 import { useNavigate, useParams } from "react-router-dom";
+import toast from "react-hot-toast";
 
+/**
+ * Rewritten to match the real backend Machine schema (models/Machine.js) —
+ * the previous version of this form posted fields (name, ownership,
+ * vendorId, rateType, rentRate, internalRate, fuelType) that don't exist
+ * anywhere in the Machine model or addMachine/updateMachine controllers,
+ * so nothing it submitted was ever actually saved correctly. It also
+ * called useGetMachineByIdQuery / useUpdateMachineMutation, neither of
+ * which existed as real endpoints — both are now real
+ * (GET/PUT /api/machines/:id).
+ */
 export default function AddEditMachine() {
     const navigate = useNavigate();
     const { id } = useParams();
 
-    const { data } = useGetMachineByIdQuery(id, { skip: !id });
-    const [addMachine] = useAddMachineMutation();
-    const [updateMachine] = useUpdateMachineMutation();
+    const { data } = useGetMachineDetailsQuery(id, { skip: !id });
+    const [addMachine, { isLoading: adding }] = useAddMachineMutation();
+    const [updateMachine, { isLoading: updating }] = useUpdateMachineMutation();
 
     const [form, setForm] = useState({
-        name: "",
+        machineNumber: "",
+        engineNumber: "",
+        chassisNumber: "",
         machineType: "",
-        ownership: "Owned",
-        vendorId: "",
-        rateType: "Hour",
-        rentRate: "",
-        internalRate: "",
-        fuelType: "Diesel",
+        ownedOrRented: "owned",
+        rcExpiry: "",
+        insuranceExpiry: "",
+        notes: "",
     });
 
+    const [files, setFiles] = useState({ photo: null, rcFile: null, insuranceFile: null });
+
     useEffect(() => {
-        if (id && data?.data) setForm(data.data);
+        if (id && data?.machine) {
+            const m = data.machine;
+            setForm({
+                machineNumber: m.machineNumber || "",
+                engineNumber: m.engineNumber || "",
+                chassisNumber: m.chassisNumber || "",
+                machineType: m.machineType || "",
+                ownedOrRented: m.ownedOrRented || "owned",
+                rcExpiry: m.rcExpiry ? m.rcExpiry.slice(0, 10) : "",
+                insuranceExpiry: m.insuranceExpiry ? m.insuranceExpiry.slice(0, 10) : "",
+                notes: m.notes || "",
+            });
+        }
     }, [id, data]);
+
+    const handleFileChange = (e) => {
+        const { name, files: fileList } = e.target;
+        setFiles((prev) => ({ ...prev, [name]: fileList?.[0] || null }));
+    };
+
+    const buildFormData = () => {
+        const fd = new FormData();
+        Object.entries(form).forEach(([key, value]) => {
+            if (value !== "" && value !== null && value !== undefined) fd.append(key, value);
+        });
+        Object.entries(files).forEach(([key, file]) => {
+            if (file) fd.append(key, file);
+        });
+        return fd;
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (id) {
-            await updateMachine({ id, ...form });
-        } else {
-            await addMachine(form);
+
+        if (!form.machineNumber || !form.machineType) {
+            toast.error("Machine number and type are required");
+            return;
         }
-        navigate("/machines");
+
+        try {
+            const fd = buildFormData();
+            if (id) {
+                await updateMachine({ id, formData: fd }).unwrap();
+                toast.success("Machine updated successfully");
+            } else {
+                await addMachine(fd).unwrap();
+                toast.success("Machine added successfully");
+            }
+            navigate("/machines");
+        } catch (err) {
+            toast.error(err?.data?.message || "Error saving machine");
+        }
     };
+
+    const isLoading = adding || updating;
 
     return (
         <div className="p-6 max-w-xl mx-auto">
@@ -51,88 +107,97 @@ export default function AddEditMachine() {
             >
                 <input
                     type="text"
-                    placeholder="Machine Name"
-                    value={form.name}
+                    placeholder="Machine Number (e.g. plate/registration) *"
+                    value={form.machineNumber}
                     className="border p-2 w-full rounded"
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    onChange={(e) => setForm({ ...form, machineNumber: e.target.value })}
                     required
                 />
 
                 <input
                     type="text"
-                    placeholder="Machine Type (JCB, Roller...)"
+                    placeholder="Machine Type (e.g. Excavator, Truck) *"
                     value={form.machineType}
                     className="border p-2 w-full rounded"
                     onChange={(e) => setForm({ ...form, machineType: e.target.value })}
                     required
                 />
 
-                {/* Ownership */}
-                <select
-                    value={form.ownership}
-                    className="border p-2 w-full rounded"
-                    onChange={(e) => setForm({ ...form, ownership: e.target.value })}
-                >
-                    <option value="Owned">Owned</option>
-                    <option value="Rented">Rented</option>
-                </select>
-
-                {/* Vendor Field only on rented */}
-                {form.ownership === "Rented" && (
+                <div className="grid grid-cols-2 gap-3">
                     <input
                         type="text"
-                        placeholder="Vendor ID (Temporary)"
-                        className="border p-2 w-full rounded"
-                        value={form.vendorId}
-                        onChange={(e) => setForm({ ...form, vendorId: e.target.value })}
-                        required
-                    />
-                )}
-
-                {/* Rate Input */}
-                <div className="grid grid-cols-2 gap-3">
-                    <select
+                        placeholder="Engine Number"
+                        value={form.engineNumber}
                         className="border p-2 rounded"
-                        value={form.rateType}
-                        onChange={(e) => setForm({ ...form, rateType: e.target.value })}
-                    >
-                        <option value="Hour">Hour</option>
-                        <option value="Day">Day</option>
-                        <option value="Month">Month</option>
-                    </select>
-
+                        onChange={(e) => setForm({ ...form, engineNumber: e.target.value })}
+                    />
                     <input
-                        type="number"
-                        placeholder={form.ownership === "Rented" ? "Rent Rate" : "Internal Rate"}
-                        className="border p-2 rounded w-full"
-                        value={form.ownership === "Rented" ? form.rentRate : form.internalRate}
-                        onChange={(e) =>
-                            setForm({
-                                ...form,
-                                [form.ownership === "Rented" ? "rentRate" : "internalRate"]:
-                                    e.target.value,
-                            })
-                        }
+                        type="text"
+                        placeholder="Chassis Number"
+                        value={form.chassisNumber}
+                        className="border p-2 rounded"
+                        onChange={(e) => setForm({ ...form, chassisNumber: e.target.value })}
                     />
                 </div>
 
-                {/* Fuel Type */}
                 <select
                     className="border p-2 w-full rounded"
-                    value={form.fuelType}
-                    onChange={(e) => setForm({ ...form, fuelType: e.target.value })}
+                    value={form.ownedOrRented}
+                    onChange={(e) => setForm({ ...form, ownedOrRented: e.target.value })}
                 >
-                    <option value="Diesel">Diesel</option>
-                    <option value="Petrol">Petrol</option>
-                    <option value="Electric">Electric</option>
-                    <option value="NA">NA</option>
+                    <option value="owned">Owned</option>
+                    <option value="rented">Rented</option>
                 </select>
+
+                <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <label className="block text-sm text-gray-600 mb-1">RC Expiry</label>
+                        <input
+                            type="date"
+                            className="border p-2 rounded w-full"
+                            value={form.rcExpiry}
+                            onChange={(e) => setForm({ ...form, rcExpiry: e.target.value })}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm text-gray-600 mb-1">Insurance Expiry</label>
+                        <input
+                            type="date"
+                            className="border p-2 rounded w-full"
+                            value={form.insuranceExpiry}
+                            onChange={(e) => setForm({ ...form, insuranceExpiry: e.target.value })}
+                        />
+                    </div>
+                </div>
+
+                <textarea
+                    placeholder="Notes"
+                    className="border p-2 w-full rounded"
+                    value={form.notes}
+                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                />
+
+                <div className="grid grid-cols-3 gap-3">
+                    <div>
+                        <label className="block text-sm text-gray-600 mb-1">Photo</label>
+                        <input type="file" name="photo" accept="image/*" onChange={handleFileChange} />
+                    </div>
+                    <div>
+                        <label className="block text-sm text-gray-600 mb-1">RC File</label>
+                        <input type="file" name="rcFile" accept="image/*,.pdf" onChange={handleFileChange} />
+                    </div>
+                    <div>
+                        <label className="block text-sm text-gray-600 mb-1">Insurance File</label>
+                        <input type="file" name="insuranceFile" accept="image/*,.pdf" onChange={handleFileChange} />
+                    </div>
+                </div>
 
                 <button
                     type="submit"
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg w-full"
+                    disabled={isLoading}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg w-full disabled:opacity-60"
                 >
-                    {id ? "Update" : "Save"}
+                    {isLoading ? "Saving..." : id ? "Update" : "Save"}
                 </button>
             </form>
         </div>

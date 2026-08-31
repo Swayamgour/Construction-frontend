@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import toast from "react-hot-toast";
-import { useGetAllAttendanceQuery, useGetAssignedLabourQuery, useBulkMarkLabourMutation } from "../../Reduxe/Api";
+import { useGetTodaysPresentLaboursQuery, useGetAssignedLabourQuery, useBulkMarkLabourMutation } from "../../Reduxe/Api";
 
 const STATUS_OPTIONS = [
     { value: "Present", label: "Present", color: "green" },
@@ -27,8 +27,11 @@ const ProjectAttendancePage = () => {
     // Local state: labourId -> status for new attendance
     const [attendanceMap, setAttendanceMap] = useState({});
 
-    // Fetch existing attendance data
-    const { data: attendanceData, refetch: refetchAttendance } = useGetAllAttendanceQuery(projectId);
+    // Fetch existing attendance data.
+    // NOTE: there is no backend endpoint for "all attendance history for a
+    // project" — the closest real one is today's present labours (global,
+    // filtered client-side below by projectId via the labour's assignment).
+    const { data: attendanceData, refetch: refetchAttendance } = useGetTodaysPresentLaboursQuery();
     const { data: labourData, isLoading } = useGetAssignedLabourQuery(projectId);
     const [MarkAttendance] = useBulkMarkLabourMutation();
 
@@ -144,11 +147,12 @@ const ProjectAttendancePage = () => {
     };
 
     const getAttendanceStatusForLabour = (labourId) => {
-        if (!attendanceData?.data) return null;
+        if (!attendanceData) return null;
 
-        const todayAttendance = attendanceData.data.find(att => {
+        const todayAttendance = attendanceData.find(att => {
             const attDate = new Date(att.date).toISOString().slice(0, 10);
-            return attDate === date && att.labourId === labourId;
+            const attLabourId = att.labourId?._id || att.labourId;
+            return attDate === date && String(attLabourId) === String(labourId);
         });
 
         return todayAttendance?.status || null;

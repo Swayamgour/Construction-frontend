@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  useGetMachinesQuery,
+  useGetAllMachinesQuery,
   useAllocateMachineMutation,
   useReleaseMachineMutation,
   useGetAllocationsQuery,
@@ -20,7 +20,7 @@ import {
 import { toast } from "react-hot-toast";
 
 export default function MachineAllocation() {
-  const { data: machinesData = [] } = useGetMachinesQuery();
+  const { data: machinesData = [] } = useGetAllMachinesQuery();
   const { data: projectsData = [] } = useAssignProjectQuery();
   const { data: allocations = [], isLoading } = useGetAllocationsQuery();
 

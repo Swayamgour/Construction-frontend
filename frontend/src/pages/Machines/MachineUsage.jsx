@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-    useGetMachinesQuery,
+    useGetAllMachinesQuery,
     useAddMachineUsageMutation,
     useGetMachineUsageQuery,
 } from "../../Reduxe/Api";
@@ -8,7 +8,7 @@ import { useAssignProjectQuery } from "../../Reduxe/Api";
 import { FiCheckCircle, FiClock } from "react-icons/fi";
 
 export default function MachineUsage() {
-    const { data: machinesData = [] } = useGetMachinesQuery();
+    const { data: machinesData = [] } = useGetAllMachinesQuery();
     const { data: projectsData = [] } = useAssignProjectQuery();
     const { data: usageData = [], isLoading } = useGetMachineUsageQuery();
 

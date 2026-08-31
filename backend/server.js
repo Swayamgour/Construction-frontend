@@ -25,9 +25,21 @@ import consumptionRoutes from "./routes/consumptionRoutes.js";
 import stockRoutes from "./routes/stockRoutes.js";
 import assignmentRoutes from "./routes/assignmentRoutes.js";
 import ganttRoutes from "./routes/ganttRoutes.js";
-// import assignWorkRoutes from "./routes/assignWorkRoutes.js";
-// import { cloudinary } from "./config/cloudinary.js";
 import cloudinary from "./config/cloudinary.js";
+
+// ⭐ NEW MODULES — Labour transfer/overtime, Stock Request/Transfer/Procurement,
+// Drawings, Machinery Request/Documents/Operator/Maintenance, EOD, Delay,
+// Notifications, Audit history, Reports (see FEATURE_ENHANCEMENT_SUMMARY.md)
+import labourManagementRoutes from "./routes/labourManagementRoutes.js";
+import projectLabourRoutes from "./routes/projectLabourRoutes.js";
+import drawingRoutes from "./routes/drawingRoutes.js";
+import machineManagementRoutes from "./routes/machineManagementRoutes.js";
+import eodRoutes from "./routes/eodRoutes.js";
+import delayRoutes from "./routes/delayRoutes.js";
+import projectDelayRoutes from "./routes/projectDelayRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
+import auditRoutes from "./routes/auditRoutes.js";
+import erpReportRoutes from "./routes/erpReportRoutes.js";
 
 
 
@@ -56,6 +68,22 @@ app.use("/api/machines", machineRoutes);
 app.use("/api/assignments", assignmentRoutes);
 app.use("/api/gantt", ganttRoutes);
 // app.use("/api/", consumptionRoutes);
+
+// ⭐ NEW MODULE MOUNTS
+// Note: existing project routes are mounted at singular /api/project; the
+// spec's exact paths (GET /api/projects/:projectId/labour, POST
+// /api/projects/:projectId/delays) use the plural /api/projects prefix,
+// which is a NEW mount and does not collide with the existing one.
+app.use("/api/labour", labourManagementRoutes);
+app.use("/api/projects", projectLabourRoutes);
+app.use("/api/projects", projectDelayRoutes);
+app.use("/api/drawings", drawingRoutes);
+app.use("/api/machinery", machineManagementRoutes);
+app.use("/api/eod", eodRoutes);
+app.use("/api/delays", delayRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/audit", auditRoutes);
+app.use("/api/reports", erpReportRoutes);
 
 
 

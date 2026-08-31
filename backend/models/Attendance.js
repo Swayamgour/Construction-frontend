@@ -56,6 +56,28 @@ const attendanceSchema = new mongoose.Schema({
         default: null
     },
 
+    // ⭐ OVERTIME & WORKING-TIME ENGINE (additive — does not affect existing fields above)
+    checkInTime: { type: String, default: null },   // "HH:mm"
+    checkOutTime: { type: String, default: null },  // "HH:mm"
+
+    regularWorkingHours: { type: Number, default: 0 },
+    totalWorkingHours: { type: Number, default: 0 },
+
+    regularRate: { type: Number, default: 0 },
+    overtimeRate: { type: Number, default: 0 },
+    regularAmount: { type: Number, default: 0 },
+    overtimeAmount: { type: Number, default: 0 },
+    totalAmount: { type: Number, default: 0 },
+
+    overtimeApprovalStatus: {
+        type: String,
+        enum: ["Not Applicable", "Pending", "Approved", "Rejected"],
+        default: "Not Applicable",
+    },
+    overtimeApprovedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    overtimeApprovedAt: { type: Date, default: null },
+    overtimeRejectionReason: { type: String, default: "" },
+
     // ⭐ NEW FIELDS FOR SELFIE + LOCATION
     latitude: { type: Number },
     longitude: { type: Number },

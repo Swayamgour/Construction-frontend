@@ -252,9 +252,10 @@ export const getEmployeeAttendanceByDate = async (req, res) => {
             date: { $gte: start, $lt: end }
         };
 
-        // 👉 If login user is employee → show only his attendance
-        if (req.user.role === "employee") {
-            filter.employeeId = new mongoose.Types.ObjectId(req.user._id);
+        // 👉 Non-management roles (storekeeper/accountant/operator/labour) → show only their own attendance
+        const SELF_ONLY_ROLES = ["storekeeper", "accountant", "operator", "labour"];
+        if (SELF_ONLY_ROLES.includes(req.user.role)) {
+            filter.employeeId = new mongoose.Types.ObjectId(req.user.id);
         }
 
         const records = await EmployeeAttendance.find(filter)
@@ -279,9 +280,7 @@ export const getEmployeeAttendanceByDate = async (req, res) => {
 export const getMyAttendance = async (req, res) => {
     try {
 
-        // const userId = req.user._id;   // logged-in user
-
-        const userId = req.user._id || req.user.id;
+        const userId = req.user.id; // logged-in user (JWT payload only ever has `id`)
 
         // console.log("Logged in userId:", userId);
 

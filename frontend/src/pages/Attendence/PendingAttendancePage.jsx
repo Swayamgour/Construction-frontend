@@ -1,25 +1,25 @@
 import React, { useEffect, useState } from "react";
 // import axios from "../../utils/axiosInstance";
 import toast from "react-hot-toast";
-import { useGetPendingAttendanceQuery, useApproveAttendanceMutation } from "../../Reduxe/Api";
+import { useGetPendingLabourAttendanceQuery, useApproveLabourAttendanceMutation } from "../../Reduxe/Api";
 
 const PendingAttendancePage = () => {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(false);
     const [approvingId, setApprovingId] = useState(null);
 
-    const { data, isLoading: fetchPending, isSuccess } = useGetPendingAttendanceQuery()
+    const { data, isLoading: fetchPending, isSuccess } = useGetPendingLabourAttendanceQuery()
 
 
-    console.log(data?.pending)
+    console.log(data?.data)
 
-    const [MarkAttendance] = useApproveAttendanceMutation()
+    const [MarkAttendance] = useApproveLabourAttendanceMutation()
 
 
     useEffect(() => {
         if (isSuccess && data) {
 
-            setRecords(data?.pending || []);
+            setRecords(data?.data || []);
         }
     }, [isSuccess, data])
 

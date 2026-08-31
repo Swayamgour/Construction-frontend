@@ -2,6 +2,7 @@ import User from "../models/User.js";
 import Labour from "../models/Labour.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { ALL_ROLES } from "../config/roles.js";
 // import Attendance from "../models/Attendance.js";
 
 import MachineAssignment from "../models/MachineAssignment.js";
@@ -14,10 +15,20 @@ import mongoose from "mongoose";
 // import Project from "../models/Project.js";
 
 
-// REGISTER USER
+// REGISTER USER (PUBLIC SIGNUP)
+// 🔒 SECURITY FIX: pehle ye endpoint client se bheja gaya `role` seedha
+// database me save kar deta tha — matlab koi bhi public /register call
+// karke khud ko "admin" bana sakta tha. Ab public signup hamesha
+// "labour" role se hi banega. Privileged roles (admin/manager/supervisor/
+// storekeeper/accountant/operator) sirf admin hi createUserByAdmin se
+// bana sakta hai.
 export const registerUser = async (req, res) => {
     try {
-        const { name, phone, email, password, role } = req.body;
+        const { name, phone, email, password , role } = req.body;
+
+        if (!name || !phone || !email || !password) {
+            return res.status(400).json({ message: "name, phone, email, password required" });
+        }
 
         const userExist = await User.findOne({ email });
         if (userExist) {
@@ -31,12 +42,58 @@ export const registerUser = async (req, res) => {
             phone,
             email,
             password: hashPass,
-            role
+            role // 🔒 forced — public signup can never grant privileged roles
         });
 
-        res.status(201).json({ message: "User Registered", user });
+        const safeUser = user.toObject();
+        delete safeUser.password;
+
+        res.status(201).json({ message: "User Registered", user: safeUser });
     } catch (error) {
-        res.status(500).json({ message: "Register Error", error });
+        res.status(500).json({ message: "Register Error", error: error.message });
+    }
+};
+
+// CREATE USER (ADMIN ONLY)
+// Isse admin koi bhi role ka user bana sakta hai (manager, supervisor,
+// storekeeper, accountant, operator, labour). Route already `auth` +
+// `roleCheck("admin")` se protected hai (routes/authRoutes.js).
+export const createUserByAdmin = async (req, res) => {
+    try {
+        const { name, phone, email, password, role, projectId } = req.body;
+
+        if (!name || !phone || !email || !password || !role) {
+            return res.status(400).json({ message: "name, phone, email, password, role required" });
+        }
+
+        if (!ALL_ROLES.includes(role)) {
+            return res.status(400).json({
+                message: `Invalid role. Allowed roles: ${ALL_ROLES.join(", ")}`
+            });
+        }
+
+        const userExist = await User.findOne({ email });
+        if (userExist) {
+            return res.status(400).json({ message: "User already exists" });
+        }
+
+        const hashPass = await bcrypt.hash(password, 10);
+
+        const user = await User.create({
+            name,
+            phone,
+            email,
+            password: hashPass,
+            role,
+            projectId: projectId || null
+        });
+
+        const safeUser = user.toObject();
+        delete safeUser.password;
+
+        res.status(201).json({ message: "User created successfully", user: safeUser });
+    } catch (error) {
+        res.status(500).json({ message: "Create User Error", error: error.message });
     }
 };
 
@@ -259,6 +316,66 @@ export const addLabour = async (req, res) => {
 
 
 
+/**
+ * PUT /api/auth/labours/:id
+ * Basic-details edit for an existing Labour record (name, phone, wage,
+ * skill, etc). Does NOT touch project assignment — use /api/labour/assign
+ * or /api/labour/transfer for that, so assignment history stays intact.
+ */
+export const updateLabour = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const {
+            name, phone, gender, age, labourType, category,
+            wageType, dailyWage, monthlySalary, skillLevel,
+            aadhaarNumber, address, status,
+        } = req.body;
+
+        const labour = await Labour.findById(id);
+        if (!labour) {
+            return res.status(404).json({ message: "Labour not found" });
+        }
+
+        if (phone && phone !== labour.phone) {
+            const exists = await Labour.findOne({ phone, _id: { $ne: id } });
+            if (exists) {
+                return res.status(400).json({ message: "Another labour already uses this phone number" });
+            }
+        }
+
+        if (name !== undefined) labour.name = name;
+        if (phone !== undefined) labour.phone = phone;
+        if (gender !== undefined) labour.gender = gender;
+        if (age !== undefined) labour.age = age;
+        if (labourType !== undefined) labour.labourType = labourType;
+        if (category !== undefined) labour.category = category;
+        if (skillLevel !== undefined) labour.skillLevel = skillLevel;
+        if (wageType !== undefined) labour.wageType = wageType;
+        if (wageType === "Daily") {
+            labour.dailyWage = dailyWage ?? labour.dailyWage;
+            labour.monthlySalary = null;
+        } else if (wageType === "Monthly") {
+            labour.monthlySalary = monthlySalary ?? labour.monthlySalary;
+            labour.dailyWage = null;
+        }
+        if (aadhaarNumber !== undefined) labour.aadhaarNumber = aadhaarNumber;
+        if (address !== undefined) labour.address = address;
+        if (status !== undefined) labour.status = status;
+
+        await labour.save();
+
+        res.status(200).json({
+            message: "Labour updated successfully",
+            data: labour,
+        });
+    } catch (error) {
+        res.status(500).json({
+            message: "Error updating labour",
+            error: error.message,
+        });
+    }
+};
+
 // import User from "../models/User.js";
 
 
@@ -462,49 +579,41 @@ export const getLaboursById = async (req, res) => {
 };
 
 
-
+// DELETE USER (ADMIN ONLY)
+// 🔒 BUG FIX: ye function routes/authRoutes.js me import ho raha tha
+// lekin yaha define hi nahi tha — Express isse route register karte
+// waqt hi crash ho jaata (server start hi nahi hota). Ab properly defined.
 export const deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
 
-        if (!id) {
-            return res.status(400).json({
-                success: false,
-                message: "User ID required"
-            });
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: "Invalid user id" });
         }
 
-        // User find karo
-        const user = await User.findById(id);
+        // Admin khud apna hi account delete na kar sake (safety guard)
+        if (req.user.id === id) {
+            return res.status(400).json({ message: "You cannot delete your own account" });
+        }
+
+        const user = await User.findByIdAndDelete(id);
 
         if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: "User not found"
-            });
+            return res.status(404).json({ message: "User not found" });
         }
 
-        // 🔥 Safety check — sirf manager ya supervisor delete ho
-        if (user.role !== "manager" && user.role !== "supervisor") {
-            return res.status(403).json({
-                success: false,
-                message: "You can only delete manager or supervisor"
-            });
-        }
-
-        await User.findByIdAndDelete(id);
-
-        return res.status(200).json({
+        res.status(200).json({
             success: true,
-            message: `${user.role} deleted successfully`
+            message: "User deleted successfully"
         });
-
     } catch (error) {
-        return res.status(500).json({
+        res.status(500).json({
             success: false,
             message: "Error deleting user",
             error: error.message
         });
     }
 };
+
+
 

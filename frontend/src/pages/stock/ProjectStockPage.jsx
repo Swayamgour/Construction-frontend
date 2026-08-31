@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import {
     useGetProjectStockQuery,
     useReceiveMaterialMutation,
-    useUseMaterialMutation,
+    useOutStockMutation,
     useTransferMaterialMutation,
     useReturnMaterialMutation,
 } from "../../../src/Reduxe/Api";
@@ -23,7 +23,10 @@ const ProjectStockPage = () => {
     const [selectedItem, setSelectedItem] = useState(null);
 
     const [receiveMaterial] = useReceiveMaterialMutation();
-    const [Material] = useUseMaterialMutation();
+    // ✅ CORRECTED: useUseMaterialMutation called "/stock/use" (no such
+    // route). "Using"/consuming project stock is really an issue, which
+    // the backend already exposes as POST /stock/issue (createStockIssue).
+    const [issueStock] = useOutStockMutation();
     const [transferMaterial] = useTransferMaterialMutation();
     const [returnMaterial] = useReturnMaterialMutation();
 
@@ -60,11 +63,10 @@ const ProjectStockPage = () => {
 
     const handleUseSubmit = async () => {
         if (!form.qty) return;
-        await Material({
+        // POST /stock/issue expects { projectId, items: [{ itemId, qty }] }
+        await issueStock({
             projectId,
-            itemId: selectedItem.itemId._id,
-            qty: Number(form.qty),
-            unit: selectedItem.itemId.unit,
+            items: [{ itemId: selectedItem.itemId._id, qty: Number(form.qty) }],
             reason: form.reason,
         });
         setUseModalOpen(false);

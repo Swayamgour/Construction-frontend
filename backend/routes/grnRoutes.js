@@ -9,9 +9,9 @@ const router = express.Router();
 // 👈 ALWAYS LAST
 
 
-router.post("/add", auth, roleCheck("manager", "admin", "supervisor"), createGRN);
-router.get("/", auth, roleCheck("manager", "admin"), listGRNs);
-router.get("/ledger/:projectId/:itemId", auth, async (req, res) => {
+router.post("/add", auth, roleCheck("manager", "admin", "supervisor", "storekeeper"), createGRN);
+router.get("/", auth, roleCheck("manager", "admin", "storekeeper", "accountant"), listGRNs);
+router.get("/ledger/:projectId/:itemId", auth, roleCheck("admin", "manager", "storekeeper", "accountant"), async (req, res) => {
     try {
         const { projectId, itemId } = req.params;
 
@@ -33,7 +33,7 @@ router.get("/ledger/:projectId/:itemId", auth, async (req, res) => {
 });
 router.get("/project/:projectId", auth, getProjectStock);
 router.get("/history/:itemId/:projectId", auth, getItemHistory);
-router.get("/:id", auth, roleCheck("manager", "admin", "supervisor"), getGRN);
+router.get("/:id", auth, roleCheck("manager", "admin", "supervisor", "storekeeper"), getGRN);
 
 
 

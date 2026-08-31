@@ -12,14 +12,14 @@ import { roleCheck } from "../middleware/role.js";
 const router = express.Router();
 
 // CREATE
-router.post("/add", auth, roleCheck("admin", "manager"), addItem);
+router.post("/add", auth, roleCheck("admin", "manager", "storekeeper"), addItem);
 
 // READ
 router.get("/all", auth, getAllItems);
 router.get("/:id", auth, getItemById);
 
 // UPDATE
-router.put("/update/:id", auth, roleCheck("admin", "manager"), updateItem);
+router.put("/update/:id", auth, roleCheck("admin", "manager", "storekeeper"), updateItem);
 
 // DELETE
 router.delete("/delete/:id", auth, roleCheck("admin"), deleteItem);
