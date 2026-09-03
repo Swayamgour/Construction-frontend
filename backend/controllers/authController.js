@@ -24,7 +24,7 @@ import mongoose from "mongoose";
 // bana sakta hai.
 export const registerUser = async (req, res) => {
     try {
-        const { name, phone, email, password , role } = req.body;
+        const { name, phone, email, password, role } = req.body;
 
         if (!name || !phone || !email || !password) {
             return res.status(400).json({ message: "name, phone, email, password required" });
@@ -60,7 +60,7 @@ export const registerUser = async (req, res) => {
 // `roleCheck("admin")` se protected hai (routes/authRoutes.js).
 export const createUserByAdmin = async (req, res) => {
     try {
-        const { name, phone, email, password, role, projectId } = req.body;
+        const { name, phone, email, password, role, projectId, assignedProjects } = req.body;
 
         if (!name || !phone || !email || !password || !role) {
             return res.status(400).json({ message: "name, phone, email, password, role required" });
@@ -79,13 +79,17 @@ export const createUserByAdmin = async (req, res) => {
 
         const hashPass = await bcrypt.hash(password, 10);
 
+        // ⭐ Module 17: a user can now be scoped to more than one project.
+        // assignedProjects is optional — if omitted, projectId (unchanged
+        // behaviour) is still honoured everywhere via the token payload.
         const user = await User.create({
             name,
             phone,
             email,
             password: hashPass,
             role,
-            projectId: projectId || null
+            projectId: projectId || null,
+            assignedProjects: Array.isArray(assignedProjects) ? assignedProjects : []
         });
 
         const safeUser = user.toObject();
@@ -115,8 +119,24 @@ export const loginUser = async (req, res) => {
         const checkPass = await bcrypt.compare(password, user.password);
         if (!checkPass) return res.status(401).json({ message: "Invalid Password" });
 
+        // ⭐ Module 17 — Project-Level Authorization.
+        // The token now carries the user's accessible-project set (their
+        // single "home" projectId plus any assignedProjects), so
+        // middleware/projectAccess.js can check project access without an
+        // extra DB read on every request. Admins get an empty array here —
+        // checkProjectAccess() already lets admins through regardless.
+        const projectScope = [
+            ...(user.projectId ? [String(user.projectId)] : []),
+            ...(Array.isArray(user.assignedProjects) ? user.assignedprojects?.data?.map(String) : []),
+        ];
+
         const token = jwt.sign(
-            { id: user._id, role: user.role },
+            {
+                id: user._id,
+                role: user.role,
+                projectId: user.projectId || null,
+                assignedProjects: [...new Set(projectScope)],
+            },
             process.env.JWT_SECRET,
             { expiresIn: "7d" }
         );
@@ -453,6 +473,7 @@ export const getLaboursById = async (req, res) => {
             },
 
             // 🔥 Attendance Lookup
+            // 🔥 Attendance Lookup
             {
                 $lookup: {
                     from: "attendances",
@@ -463,7 +484,14 @@ export const getLaboursById = async (req, res) => {
                                 $expr: {
                                     $or: [
                                         { $eq: ["$labourId", "$$labourObjId"] },
-                                        { $eq: ["$labourId", { $toString: "$$labourObjId" }] },
+
+                                        {
+                                            $eq: [
+                                                "$labourId",
+                                                { $toString: "$$labourObjId" }
+                                            ]
+                                        },
+
                                         {
                                             $eq: [
                                                 { $toObjectId: "$labourId" },
@@ -474,14 +502,24 @@ export const getLaboursById = async (req, res) => {
                                 }
                             }
                         },
+
+                        // 🔥 Include complete attendance details
                         {
                             $project: {
+                                _id: 1,
+
                                 status: 1,
                                 date: 1,
                                 projectId: 1,
-                                _id: 0
+
+                                timeIn: 1,
+                                timeOut: 1,
+                                overtimeHours: 1,
+
+                                markedBy: 1
                             }
                         },
+
                         { $sort: { date: -1 } }
                     ],
                     as: "attendanceHistory"

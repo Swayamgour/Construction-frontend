@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Labour from "../models/Labour.js";
 import Project from "../models/Project.js";
 import LabourAssignment from "../models/LabourAssignment.js";
+import Attendance from "../models/Attendance.js";
 import { success, fail, getPagination, buildPagination, getDateRangeFilter } from "../utils/apiResponse.js";
 import { logAudit } from "../utils/audit.js";
 import { notifyRoles } from "../utils/notify.js";
@@ -196,6 +197,61 @@ export const getLabourAssignmentHistory = async (req, res) => {
         return success(res, 200, "Labour assignment history fetched", history);
     } catch (error) {
         return fail(res, 500, "Error fetching history", error);
+    }
+};
+
+/**
+ * GET /api/labour/:id/full-history
+ * Single aggregate endpoint requested in the spec — everything about one
+ * labour in one call instead of the frontend having to stitch together
+ * /history, an attendance query and an overtime query itself.
+ * Response shape: { labour, assignments, transfers, attendance, overtime }
+ */
+export const getLabourFullHistory = async (req, res) => {
+    try {
+        const labourId = req.params.id;
+
+        const labour = await Labour.findById(labourId).populate("assignedProjects", "projectName projectCode");
+        if (!labour) return fail(res, 404, "Labour not found");
+
+        const [allAssignments, attendance] = await Promise.all([
+            LabourAssignment.find({ labourId })
+                .populate("projectId", "projectName projectCode")
+                .populate("previousProjectId", "projectName projectCode")
+                .populate("assignedBy", "name role")
+                .populate("transferredBy", "name role")
+                .sort({ assignmentDate: -1 }),
+            Attendance.find({ labourId })
+                .populate("projectId", "projectName projectCode")
+                .sort({ date: -1 }),
+        ]);
+
+        // "assignments" = every assignment record (the full timeline);
+        // "transfers" = the subset of that timeline that a transfer
+        // touched — both the record it closed (status "Transferred") and
+        // the record it opened (transferredBy set) — so a transfer shows
+        // up as a matched pair rather than being lost inside a flat list.
+        const transfers = allAssignments.filter(
+            (a) => a.status === "Transferred" || a.transferredBy
+        );
+
+        // "overtime" = the attendance records that actually carry an
+        // overtime component, pulled from the same Attendance collection
+        // (overtime isn't a separate model in this schema — it's fields
+        // on each attendance record).
+        const overtime = attendance.filter(
+            (a) => (a.overtimeHours && a.overtimeHours > 0) || a.overtimeApprovalStatus
+        );
+
+        return success(res, 200, "Labour full history fetched", {
+            labour,
+            assignments: allAssignments,
+            transfers,
+            attendance,
+            overtime,
+        });
+    } catch (error) {
+        return fail(res, 500, "Error fetching labour full history", error);
     }
 };
 

@@ -118,7 +118,16 @@ export const listAllDelays = async (req, res) => {
         const { projectId, status, delayType } = req.query;
 
         const filter = {};
-        if (projectId) filter.projectId = projectId;
+        // ⭐ Module 17: checkProjectAccess() on this route already rejects an
+        // explicit ?projectId= outside the caller's scope. When no
+        // projectId is given at all, a non-admin must still only see their
+        // own assigned projects — otherwise this endpoint would leak every
+        // project's delays to any manager/supervisor.
+        if (projectId) {
+            filter.projectId = projectId;
+        } else if (req.user?.role !== "admin") {
+            filter.projectId = { $in: req.user?.assignedProjects || [] };
+        }
         if (status) filter.status = status;
         if (delayType) filter.delayType = delayType;
         Object.assign(filter, getDateRangeFilter(req, "delayDate"));

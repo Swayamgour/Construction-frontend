@@ -12,7 +12,7 @@ import StockLedger from "../models/stockLedgerSchema.js";
  * more than one document needs to change together.
  */
 export const applyStockLedgerEntry = async ({
-    projectId, itemId, qtyChange, transactionType, referenceId, referenceNumber, remarks, session,
+    projectId, itemId, qtyChange, transactionType, referenceId, referenceNumber, remarks, session, rate, entryDate,
 }) => {
     let stock = await Stock.findOne({ itemId }).session(session || null);
     if (!stock) {
@@ -49,6 +49,8 @@ export const applyStockLedgerEntry = async ({
                 qtyOut: qtyChange < 0 ? Math.abs(qtyChange) : 0,
                 balanceQty,
                 remarks,
+                ...(rate !== undefined ? { rate } : {}),
+                ...(entryDate !== undefined ? { entryDate } : {}),
             },
         ],
         { session }

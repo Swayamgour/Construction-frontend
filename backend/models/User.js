@@ -20,6 +20,19 @@ const userSchema = new mongoose.Schema({
         default: null
     },
 
+    // ⭐ Module 17 — Project-Level Authorization.
+    // projectId above stays as-is for backward compatibility (a user's
+    // single "home" project, used wherever existing code already reads
+    // req.user.projectId or user.projectId). assignedProjects is additive:
+    // it lets a manager/supervisor be scoped to MORE THAN ONE project
+    // without breaking anything that only knows about the single field.
+    // middleware/projectAccess.js treats the *union* of projectId and
+    // assignedProjects as the user's accessible-project set.
+    assignedProjects: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Project",
+    }],
+
     status: {
         type: Boolean,
         default: true   // true = active, false = inactive

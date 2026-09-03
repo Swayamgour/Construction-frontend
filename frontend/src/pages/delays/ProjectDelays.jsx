@@ -4,10 +4,12 @@ import ReportTable from "../../components/ReportTable";
 import {
     useGetAllDelaysQuery,
     useGetDelayCategoriesQuery,
+    useCreateDelayCategoryMutation,
     useReportDelayMutation,
     useResolveDelayMutation,
     useGetProjectsQuery,
 } from "../../Reduxe/Api";
+import { CheckRole } from "../../helper/CheckRole";
 
 /**
  * NEW PAGE — UI for the backend's Project Delay module
@@ -15,19 +17,36 @@ import {
  * Entirely new module — no frontend existed for this before.
  */
 const ProjectDelays = () => {
+    const { role } = CheckRole();
     const [showCreate, setShowCreate] = useState(false);
     const [resolveModal, setResolveModal] = useState(null);
+    const [showCategoryAdmin, setShowCategoryAdmin] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState("");
 
     const { data, isLoading, refetch } = useGetAllDelaysQuery({});
-    const { data: catResp } = useGetDelayCategoriesQuery();
+    const { data: catResp, refetch: refetchCategories } = useGetDelayCategoriesQuery();
     const { data: projectResp } = useGetProjectsQuery();
 
     const [reportDelay, { isLoading: reporting }] = useReportDelayMutation();
     const [resolveDelay, { isLoading: resolving }] = useResolveDelayMutation();
+    const [createCategory, { isLoading: creatingCategory }] = useCreateDelayCategoryMutation();
 
     const delays = data?.data || [];
     const categories = catResp?.data || [];
     const projects = projectResp?.data || projectResp || [];
+
+    const submitCategory = async (e) => {
+        e.preventDefault();
+        if (!newCategoryName.trim()) return;
+        try {
+            await createCategory({ name: newCategoryName.trim() }).unwrap();
+            toast.success("Delay category created");
+            setNewCategoryName("");
+            refetchCategories();
+        } catch (err) {
+            toast.error(err?.data?.message || "Failed to create category");
+        }
+    };
 
     const [form, setForm] = useState({
         projectId: "", delayDate: new Date().toISOString().slice(0, 10), delayType: "",
@@ -87,16 +106,48 @@ const ProjectDelays = () => {
         <div className="p-6 max-w-7xl mx-auto space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-gray-800">Project Delays</h1>
-                <button onClick={() => setShowCreate((v) => !v)} className="px-4 py-2 bg-blue-600 text-white rounded-lg">
-                    {showCreate ? "Close" : "+ Report Delay"}
-                </button>
+                <div className="flex gap-2">
+                    {role === "admin" && (
+                        <button onClick={() => setShowCategoryAdmin((v) => !v)} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                            {showCategoryAdmin ? "Close" : "Manage Categories"}
+                        </button>
+                    )}
+                    <button onClick={() => setShowCreate((v) => !v)} className="px-4 py-2 bg-blue-600 text-white rounded-lg">
+                        {showCreate ? "Close" : "+ Report Delay"}
+                    </button>
+                </div>
             </div>
+
+            {showCategoryAdmin && (
+                <div className="bg-white rounded-xl shadow p-6">
+                    <h2 className="font-semibold text-gray-800 mb-3">Delay Categories</h2>
+                    <form onSubmit={submitCategory} className="flex gap-2 mb-4">
+                        <input
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            placeholder="e.g. Weather, Material Shortage"
+                            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+                        />
+                        <button disabled={creatingCategory} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-60">
+                            {creatingCategory ? "Adding..." : "Add Category"}
+                        </button>
+                    </form>
+                    <div className="flex flex-wrap gap-2">
+                        {categories.map((c) => (
+                            <span key={c._id} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+                                {c.name}
+                            </span>
+                        ))}
+                        {categories.length === 0 && <p className="text-sm text-gray-400">No categories yet.</p>}
+                    </div>
+                </div>
+            )}
 
             {showCreate && (
                 <form onSubmit={handleCreate} className="bg-white rounded-xl shadow p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <select className="border p-2 rounded-lg" value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })} required>
                         <option value="">Select Project</option>
-                        {projects.map((p) => <option key={p._id} value={p._id}>{p.projectName}</option>)}
+                        {projects?.map((p) => <option key={p._id} value={p._id}>{p.projectName}</option>)}
                     </select>
                     <input type="date" className="border p-2 rounded-lg" value={form.delayDate} onChange={(e) => setForm({ ...form, delayDate: e.target.value })} required />
 

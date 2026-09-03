@@ -2,15 +2,91 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
     useGetMachineDetailsQuery,
-    useReleaseMachineMutation
+    useReleaseMachineMutation,
+    useGetMachineDocumentsQuery,
+    useAddMachineDocumentMutation,
+    useVerifyMachineDocumentMutation,
+    useGetMachineOperatorLogsQuery,
+    useLogMachineOperatorDayMutation,
+    useApproveOperatorLogMutation,
+    useGetFullMaintenanceHistoryQuery,
+    useReportMachineMaintenanceMutation,
+    useUpdateMaintenanceStatusMutation,
 } from "../../Reduxe/Api";
 import toast from "react-hot-toast";
+import { CheckRole } from "../../helper/CheckRole";
+import OperatorAssignmentPanel from "./OperatorAssignmentPanel";
 
 export default function MachineDetails() {
     const { id } = useParams();
+    const { role } = CheckRole();
     const { data, isLoading, refetch } = useGetMachineDetailsQuery(id);
     const [releaseMachine, { isLoading: isReleasing }] = useReleaseMachineMutation();
     const [activeTab, setActiveTab] = useState("overview");
+
+    // Documents
+    const { data: docsData, refetch: refetchDocs } = useGetMachineDocumentsQuery(id, { skip: activeTab !== "documents" });
+    const [addDocument] = useAddMachineDocumentMutation();
+    const [verifyDocument] = useVerifyMachineDocumentMutation();
+    const [docForm, setDocForm] = useState({ docType: "", expiryDate: "", file: null });
+
+    // Operator logs
+    const { data: opLogsData, refetch: refetchOpLogs } = useGetMachineOperatorLogsQuery({ id }, { skip: activeTab !== "operator" });
+    const [logOperatorDay] = useLogMachineOperatorDayMutation();
+    const [approveOperatorLog] = useApproveOperatorLogMutation();
+    const [opForm, setOpForm] = useState({ date: new Date().toISOString().slice(0, 10), hoursWorked: "", remarks: "" });
+
+    // Full maintenance
+    const { data: fullMaintData, refetch: refetchFullMaint } = useGetFullMaintenanceHistoryQuery({ id }, { skip: activeTab !== "full-maintenance" });
+    const [reportMaintenance] = useReportMachineMaintenanceMutation();
+    const [updateMaintStatus] = useUpdateMaintenanceStatusMutation();
+    const [maintForm, setMaintForm] = useState({ issue: "", cost: "" });
+
+    const submitDocument = async (e) => {
+        e.preventDefault();
+        if (!docForm.docType || !docForm.file) return toast.error("Document type and file are required");
+        const formData = new FormData();
+        formData.append("docType", docForm.docType);
+        if (docForm.expiryDate) formData.append("expiryDate", docForm.expiryDate);
+        formData.append("file", docForm.file);
+        try {
+            await addDocument({ id, formData }).unwrap();
+            toast.success("Document uploaded");
+            setDocForm({ docType: "", expiryDate: "", file: null });
+            refetchDocs();
+        } catch (err) {
+            toast.error(err?.data?.message || "Upload failed");
+        }
+    };
+
+    const submitOperatorLog = async (e) => {
+        e.preventDefault();
+        if (!opForm.hoursWorked) return toast.error("Hours worked is required");
+        try {
+            await logOperatorDay({ id, ...opForm }).unwrap();
+            toast.success("Operator log recorded");
+            setOpForm({ date: new Date().toISOString().slice(0, 10), hoursWorked: "", remarks: "" });
+            refetchOpLogs();
+        } catch (err) {
+            toast.error(err?.data?.message || "Failed to log");
+        }
+    };
+
+    const submitMaintenanceReport = async (e) => {
+        e.preventDefault();
+        if (!maintForm.issue) return toast.error("Describe the issue");
+        const formData = new FormData();
+        formData.append("issue", maintForm.issue);
+        if (maintForm.cost) formData.append("cost", maintForm.cost);
+        try {
+            await reportMaintenance({ id, formData }).unwrap();
+            toast.success("Maintenance issue reported");
+            setMaintForm({ issue: "", cost: "" });
+            refetchFullMaint();
+        } catch (err) {
+            toast.error(err?.data?.message || "Failed to report");
+        }
+    };
 
     const handleRelease = async () => {
         if (window.confirm("Are you sure you want to release this machine?")) {
@@ -201,7 +277,7 @@ export default function MachineDetails() {
                 <div className="mb-8">
                     <div className="border-b border-gray-200">
                         <nav className="-mb-px flex space-x-8">
-                            {["overview", "maintenance", "assignments", "usage"].map((tab) => (
+                            {["overview", "maintenance", "assignments", "usage", "documents", "operator", "full-maintenance"].map((tab) => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
@@ -261,10 +337,6 @@ export default function MachineDetails() {
 
                                             <div className="space-y-3">
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-600">Operator ID:</span>
-                                                    <span className="font-medium">{currentAssignment.operatorId}</span>
-                                                </div>
-                                                <div className="flex justify-between">
                                                     <span className="text-gray-600">Project ID:</span>
                                                     <span className="font-medium">{currentAssignment.projectId}</span>
                                                 </div>
@@ -273,6 +345,8 @@ export default function MachineDetails() {
                                                     <span className="font-medium">{currentAssignment.notes || 'No notes'}</span>
                                                 </div>
                                             </div>
+
+                                            <OperatorAssignmentPanel assignment={currentAssignment} onChanged={refetch} />
 
                                             <button
                                                 onClick={handleRelease}
@@ -464,6 +538,175 @@ export default function MachineDetails() {
                                     <p className="text-gray-500">Usage tracking has not been enabled for this machine.</p>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* Documents Tab */}
+                    {activeTab === "documents" && (
+                        <div className="p-8">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-6">Machine Documents</h3>
+                            <form onSubmit={submitDocument} className="flex flex-wrap gap-3 items-end mb-6 bg-gray-50 rounded-xl p-4">
+                                <div>
+                                    <label className="text-xs font-medium text-gray-600">Document Type</label>
+                                    <input required value={docForm.docType} onChange={(e) => setDocForm({ ...docForm, docType: e.target.value })}
+                                        placeholder="e.g. RC, Insurance, Fitness"
+                                        className="mt-1 block rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-gray-600">Expiry Date</label>
+                                    <input type="date" value={docForm.expiryDate} onChange={(e) => setDocForm({ ...docForm, expiryDate: e.target.value })}
+                                        className="mt-1 block rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-gray-600">File</label>
+                                    <input required type="file" onChange={(e) => setDocForm({ ...docForm, file: e.target.files[0] })}
+                                        className="mt-1 block text-sm" />
+                                </div>
+                                <button className="bg-blue-900 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg">Upload</button>
+                            </form>
+                            <div className="space-y-3">
+                                {(docsData?.data || []).length === 0 && <p className="text-gray-500 text-sm">No documents uploaded yet.</p>}
+                                {(docsData?.data || []).map((doc) => (
+                                    <div key={doc._id} className="border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+                                        <div>
+                                            <p className="font-medium text-slate-800">{doc.docType}</p>
+                                            <p className="text-xs text-gray-500">
+                                                {doc.expiryDate ? `Expires ${new Date(doc.expiryDate).toLocaleDateString()}` : "No expiry"}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${doc.verified ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                                                {doc.verified ? "Verified" : "Pending verification"}
+                                            </span>
+                                            {!doc.verified && (role === "admin" || role === "manager") && (
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            await verifyDocument({ docId: doc._id, verified: true }).unwrap();
+                                                            toast.success("Document verified");
+                                                            refetchDocs();
+                                                        } catch (err) {
+                                                            toast.error(err?.data?.message || "Failed");
+                                                        }
+                                                    }}
+                                                    className="text-blue-700 text-xs font-semibold hover:underline"
+                                                >
+                                                    Verify
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Operator Logs Tab */}
+                    {activeTab === "operator" && (
+                        <div className="p-8">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-6">Operator Logs</h3>
+                            <form onSubmit={submitOperatorLog} className="flex flex-wrap gap-3 items-end mb-6 bg-gray-50 rounded-xl p-4">
+                                <div>
+                                    <label className="text-xs font-medium text-gray-600">Date</label>
+                                    <input type="date" value={opForm.date} onChange={(e) => setOpForm({ ...opForm, date: e.target.value })}
+                                        className="mt-1 block rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-gray-600">Hours Worked</label>
+                                    <input required type="number" min="0" value={opForm.hoursWorked} onChange={(e) => setOpForm({ ...opForm, hoursWorked: e.target.value })}
+                                        className="mt-1 block rounded-lg border border-gray-300 px-3 py-2 text-sm w-28" />
+                                </div>
+                                <div className="flex-1 min-w-[160px]">
+                                    <label className="text-xs font-medium text-gray-600">Remarks</label>
+                                    <input value={opForm.remarks} onChange={(e) => setOpForm({ ...opForm, remarks: e.target.value })}
+                                        className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                                </div>
+                                <button className="bg-blue-900 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg">Log Day</button>
+                            </form>
+                            <div className="space-y-3">
+                                {(opLogsData?.data || []).length === 0 && <p className="text-gray-500 text-sm">No operator logs yet.</p>}
+                                {(opLogsData?.data || []).map((log) => (
+                                    <div key={log._id} className="border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+                                        <div>
+                                            <p className="font-medium text-slate-800">{log.date ? new Date(log.date).toLocaleDateString() : "-"} • {log.hoursWorked}h</p>
+                                            {log.remarks && <p className="text-xs text-gray-500">{log.remarks}</p>}
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${log.approved ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                                                {log.approved ? "Approved" : "Pending"}
+                                            </span>
+                                            {!log.approved && (role === "admin" || role === "manager") && (
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            await approveOperatorLog(log._id).unwrap();
+                                                            toast.success("Log approved");
+                                                            refetchOpLogs();
+                                                        } catch (err) {
+                                                            toast.error(err?.data?.message || "Failed");
+                                                        }
+                                                    }}
+                                                    className="text-blue-700 text-xs font-semibold hover:underline"
+                                                >
+                                                    Approve
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Full Maintenance Workflow Tab */}
+                    {activeTab === "full-maintenance" && (
+                        <div className="p-8">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-6">Maintenance Workflow</h3>
+                            <form onSubmit={submitMaintenanceReport} className="flex flex-wrap gap-3 items-end mb-6 bg-gray-50 rounded-xl p-4">
+                                <div className="flex-1 min-w-[220px]">
+                                    <label className="text-xs font-medium text-gray-600">Report an Issue</label>
+                                    <input required value={maintForm.issue} onChange={(e) => setMaintForm({ ...maintForm, issue: e.target.value })}
+                                        className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-gray-600">Est. Cost</label>
+                                    <input type="number" min="0" value={maintForm.cost} onChange={(e) => setMaintForm({ ...maintForm, cost: e.target.value })}
+                                        className="mt-1 block rounded-lg border border-gray-300 px-3 py-2 text-sm w-28" />
+                                </div>
+                                <button className="bg-blue-900 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg">Report Issue</button>
+                            </form>
+                            <div className="space-y-3">
+                                {(fullMaintData?.data || []).length === 0 && <p className="text-gray-500 text-sm">No maintenance issues logged.</p>}
+                                {(fullMaintData?.data || []).map((m) => (
+                                    <div key={m._id} className="border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+                                        <div>
+                                            <p className="font-medium text-slate-800">{m.issue}</p>
+                                            <p className="text-xs text-gray-500">{m.status || "Reported"} {m.cost ? `• ₹${m.cost}` : ""}</p>
+                                        </div>
+                                        {(role === "admin" || role === "manager") && m.status !== "Resolved" && (
+                                            <div className="flex gap-2">
+                                                {["In Progress", "Resolved"].map((s) => (
+                                                    <button
+                                                        key={s}
+                                                        onClick={async () => {
+                                                            try {
+                                                                await updateMaintStatus({ id: m._id, status: s }).unwrap();
+                                                                toast.success(`Marked ${s}`);
+                                                                refetchFullMaint();
+                                                            } catch (err) {
+                                                                toast.error(err?.data?.message || "Failed");
+                                                            }
+                                                        }}
+                                                        className="text-blue-700 text-xs font-semibold hover:underline"
+                                                    >
+                                                        {s}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>

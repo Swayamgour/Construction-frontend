@@ -43,7 +43,8 @@ const StockRequests = () => {
 
     const requests = data?.data || [];
     const projects = projectResp?.data || projectResp || [];
-    const items = itemResp?.data || itemResp || [];
+    const items = itemResp?.items || itemResp || [];
+    console.log(items , projectResp)
     const vendors = vendorResp?.data || vendorResp || [];
 
     const [form, setForm] = useState({
@@ -120,27 +121,33 @@ const StockRequests = () => {
         { header: "Material", render: (row) => `${row.materialName} x ${row.quantity} ${row.unit}` },
         { header: "Requested By", render: (row) => `${row.requestedBy?.name || "-"} (${row.requestedByRole})` },
         { header: "Priority", accessor: "priority" },
-        { header: "Images", render: (row) => row.images?.length ? (
-            <div className="flex gap-1">
-                {row.images.slice(0, 3).map((img, i) => (
-                    <a key={i} href={img} target="_blank" rel="noreferrer">
-                        <img src={img} alt="" className="w-8 h-8 rounded object-cover border" />
-                    </a>
-                ))}
-            </div>
-        ) : "-" },
-        { header: "Status", render: (row) => (
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[row.status] || "bg-gray-100"}`}>
-                {row.status.replaceAll("_", " ")}
-            </span>
-        )},
-        { header: "Action", render: (row) => row.status === "PENDING_ADMIN_REVIEW" ? (
-            <div className="flex gap-2 flex-wrap">
-                <button onClick={() => setFulfilModal({ request: row, type: "transfer" })} className="px-2 py-1 bg-blue-600 text-white rounded text-xs">Transfer</button>
-                <button onClick={() => setFulfilModal({ request: row, type: "procurement" })} className="px-2 py-1 bg-purple-600 text-white rounded text-xs">Procure</button>
-                <button onClick={() => handleReject(row._id)} className="px-2 py-1 bg-red-600 text-white rounded text-xs">Reject</button>
-            </div>
-        ) : "-" },
+        {
+            header: "Images", render: (row) => row.images?.length ? (
+                <div className="flex gap-1">
+                    {row.images.slice(0, 3).map((img, i) => (
+                        <a key={i} href={img} target="_blank" rel="noreferrer">
+                            <img src={img} alt="" className="w-8 h-8 rounded object-cover border" />
+                        </a>
+                    ))}
+                </div>
+            ) : "-"
+        },
+        {
+            header: "Status", render: (row) => (
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[row.status] || "bg-gray-100"}`}>
+                    {row.status.replaceAll("_", " ")}
+                </span>
+            )
+        },
+        {
+            header: "Action", render: (row) => row.status === "PENDING_ADMIN_REVIEW" ? (
+                <div className="flex gap-2 flex-wrap">
+                    <button onClick={() => setFulfilModal({ request: row, type: "transfer" })} className="px-2 py-1 bg-blue-600 text-white rounded text-xs">Transfer</button>
+                    <button onClick={() => setFulfilModal({ request: row, type: "procurement" })} className="px-2 py-1 bg-purple-600 text-white rounded text-xs">Procure</button>
+                    <button onClick={() => handleReject(row._id)} className="px-2 py-1 bg-red-600 text-white rounded text-xs">Reject</button>
+                </div>
+            ) : "-"
+        },
     ];
 
     return (
@@ -156,12 +163,12 @@ const StockRequests = () => {
                 <form onSubmit={handleCreate} className="bg-white rounded-xl shadow p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <select className="border p-2 rounded-lg" value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })} required>
                         <option value="">Select Project</option>
-                        {projects.map((p) => <option key={p._id} value={p._id}>{p.projectName}</option>)}
+                        {projects?.map((p) => <option key={p._id} value={p._id}>{p.projectName}</option>)}
                     </select>
 
                     <select className="border p-2 rounded-lg" value={form.materialId} onChange={(e) => setForm({ ...form, materialId: e.target.value, unit: items.find(i => i._id === e.target.value)?.unit || "" })} required>
                         <option value="">Select Material</option>
-                        {items.map((it) => <option key={it._id} value={it._id}>{it.name}</option>)}
+                        {items?.map((it) => <option key={it._id} value={it._id}>{it.name}</option>)}
                     </select>
 
                     <input type="number" placeholder="Quantity" className="border p-2 rounded-lg" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} required />

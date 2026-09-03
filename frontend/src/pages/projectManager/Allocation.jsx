@@ -113,7 +113,7 @@ export default function Allocation() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {projects.map(project => (
+                        {projects?.data?.map(project => (
                             <div
                                 key={project._id}
                                 onClick={() => setSelectedProject(project._id)}

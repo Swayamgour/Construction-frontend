@@ -1,6 +1,6 @@
 import Vendor from "../models/Vendor.js";
-// import Vendor from "../models/Vendor.js";
 import Item from "../models/Item.js"; // ensure model is loaded
+import { success, fail, getPagination, buildPagination } from "../utils/apiResponse.js";
 
 
 export const addVendor = async (req, res) => {
@@ -137,17 +137,41 @@ export const updateVendor = async (req, res) => {
     }
 };
 
+/**
+ * GET /api/vendors?page&limit&search&sortBy&sortOrder
+ * Added pagination/search here (follow-up audit concern #12 — this list
+ * had none before). Response shape changes from a bare array to the
+ * standard { success, data, pagination } envelope used everywhere else
+ * in the newer modules — flag this to the frontend team as a contract
+ * change if anything currently reads this endpoint as a raw array.
+ */
 export const getAllVendors = async (req, res) => {
     try {
-        const vendors = await Vendor.find()
-            .populate("itemsSupplied", "name type category unit"); // populate to show item names
+        const { page, limit, skip } = getPagination(req);
+        const { search, sortBy = "createdAt", sortOrder = "desc" } = req.query;
 
-        return res.status(200).json(vendors);
+        const filter = {};
+        if (search) {
+            filter.$or = [
+                { companyName: { $regex: search, $options: "i" } },
+                { contactPerson: { $regex: search, $options: "i" } },
+                { phone: { $regex: search, $options: "i" } },
+                { email: { $regex: search, $options: "i" } },
+            ];
+        }
+
+        const [vendors, total] = await Promise.all([
+            Vendor.find(filter)
+                .populate("itemsSupplied", "name type category unit")
+                .sort({ [sortBy]: sortOrder === "asc" ? 1 : -1 })
+                .skip(skip)
+                .limit(limit),
+            Vendor.countDocuments(filter),
+        ]);
+
+        return success(res, 200, "Vendors fetched", vendors, buildPagination(page, limit, total));
     } catch (error) {
-        res.status(500).json({
-            message: "Error fetching vendors",
-            error: error.message
-        });
+        return fail(res, 500, "Error fetching vendors", error);
     }
 };
 

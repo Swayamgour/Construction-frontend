@@ -267,15 +267,15 @@ const ConstructionERP_GanttChart = () => {
                             "on-hold": "#F2C94C"
                         };
 
-                        const minDate = new Date(Math.min(...projects.map(t => new Date(t.startDate))));
-                        const maxDate = new Date(Math.max(...projects.map(t => new Date(t.endDate))));
+                        const minDate = new Date(Math.min(...projects?.data?.map(t => new Date(t.startDate))));
+                        const maxDate = new Date(Math.max(...projects?.data?.map(t => new Date(t.endDate))));
 
                         const getDayDiff = (start, end) =>
                             Math.floor((end - start) / (1000 * 60 * 60 * 24));
 
                         return (
                             <>
-                                {projects.map((task, index) => {
+                                {projects?.data?.map((task, index) => {
                                     const start = new Date(task.startDate);
                                     const end = new Date(task.endDate);
 

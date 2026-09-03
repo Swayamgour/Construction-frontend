@@ -232,7 +232,7 @@ export default function AssignTask() {
                                     className={`w-full p-4 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all appearance-none bg-white ${errors.projectId ? 'border-red-500' : 'border-gray-200'}`}
                                 >
                                     <option value="">Select a project</option>
-                                    {projectData?.map((p) => (
+                                    {projectData?.data?.map((p) => (
                                         <option key={p._id} value={p._id}>
                                             {p.projectName} • {p.projectCode || "No Code"}
                                         </option>

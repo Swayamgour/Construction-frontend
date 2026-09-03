@@ -76,7 +76,8 @@ const Dashboard = () => {
   };
 
 
-  let projects = data
+  let projects = data?.data 
+  console.log(data)
 
   const filteredProjects = projects?.filter(project =>
     project.projectName?.toLowerCase().includes(searchTerm.toLowerCase()) ||

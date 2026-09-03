@@ -57,7 +57,7 @@ export default function AssignMachine() {
             setSelectedMachine(machine || null);
         }
         if (name === "projectId") {
-            const project = projects?.find(p => p._id === value);
+            const project = projects?.data?.find(p => p._id === value);
             setSelectedProject(project || null);
         }
         if (name === "operatorId") {
@@ -162,7 +162,7 @@ export default function AssignMachine() {
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                                 Select Project <span className="text-red-500">*</span>
                                                 <span className="ml-2 text-xs text-gray-500">
-                                                    ({projects?.length || 0} projects)
+                                                    ({projects?.data?.length || 0} projects)
                                                 </span>
                                             </label>
                                             <select
@@ -173,7 +173,7 @@ export default function AssignMachine() {
                                                 required
                                             >
                                                 <option value="">Choose a project...</option>
-                                                {projects?.map((p) => (
+                                                {projects?.data?.map((p) => (
                                                     <option value={p._id} key={p._id}>
                                                         {p.projectName} — {p.city} ({p.status || 'Active'})
                                                     </option>

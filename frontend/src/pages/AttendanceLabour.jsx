@@ -101,13 +101,13 @@ const AttendanceLabour = () => {
 
     // Calculate summary statistics
     const summaryStats = {
-        total: projects?.length || 0,
-        active: projects?.filter(p => getProgressValue(p.projectDuration) > 0 && getProgressValue(p.projectDuration) < 100).length || 0,
-        completed: projects?.filter(p => getProgressValue(p.projectDuration) >= 100).length || 0,
-        starting: projects?.filter(p => getProgressValue(p.projectDuration) <= 25).length || 0
+        total: projects?.data?.length || 0,
+        active: projects?.data?.filter(p => getProgressValue(p.projectDuration) > 0 && getProgressValue(p.projectDuration) < 100).length || 0,
+        completed: projects?.data?.filter(p => getProgressValue(p.projectDuration) >= 100).length || 0,
+        starting: projects?.data?.filter(p => getProgressValue(p.projectDuration) <= 25).length || 0
     };
 
-    const filteredProjects = projects?.filter(project =>
+    const filteredProjects = projects?.data?.filter(project =>
         project.projectName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         project.siteLocation?.toLowerCase().includes(searchTerm.toLowerCase())
     );

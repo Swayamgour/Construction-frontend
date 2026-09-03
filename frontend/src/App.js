@@ -28,6 +28,7 @@ import Setting from "./pages/Setting";
 import ApprovalSettings from "./pages/ApprovalSettings";
 import IndentPage from "./pages/IndentPage";
 import PurchaseOrder from "./pages/PurchaseOrder";
+import PurchaseOrderPage from "./pages/PurchaseOrderPage";
 import WorkDashboard from "./pages/WorkDashboard";
 import ProjectDetail from "./pages/ProjectDetail";
 // import WorkManagement from "./pages/WorkManagement";
@@ -65,12 +66,20 @@ import StockOutCreate from "./pages/stock/StockOutCreate";
 // Machinery request workflow, EOD, Project Delay). None of these had
 // any frontend before.
 import LabourTransfer from "./pages/labourManagement/LabourTransfer";
+import LabourFullHistory from "./pages/labourManagement/LabourFullHistory";
 import OvertimeManagement from "./pages/labourManagement/OvertimeManagement";
+import ProjectActiveLabour from "./pages/labourManagement/ProjectActiveLabour";
+import RecordWorkingTime from "./pages/labour/RecordWorkingTime";
+import OvertimeSettingsPage from "./pages/settings/OvertimeSettings";
 import StockRequests from "./pages/stockRequests/StockRequests";
 import DrawingRequests from "./pages/drawings/DrawingRequests";
 import MachineRequests from "./pages/machineryRequests/MachineRequests";
 import EODReports from "./pages/eod/EODReports";
 import ProjectDelays from "./pages/delays/ProjectDelays";
+import Procurement from "./pages/procurement/Procurement";
+import ReportsHub from "./pages/reports/ReportsHub";
+import AuditLogPage from "./pages/reports/AuditLogPage";
+import StockOperations from "./pages/stock/StockOperations";
 import LabourDashboard from "./pages/labour/LabourDashboard";
 import LabourDetail from "./pages/labour/LabourDetail";
 import StockItemHistory from "./pages/inventory/StockItemHistory";
@@ -388,6 +397,14 @@ function App() {
           }
         />
         <Route
+          path="/purchase-orders"
+          element={
+            <Layout>
+              <PurchaseOrderPage />
+            </Layout>
+          }
+        />
+        <Route
           path="/AddNewLabour"
           element={
             <Layout>
@@ -568,7 +585,7 @@ function App() {
         />
 
         <Route
-          path="/MyTasks/:id"
+          path="/MyTasks"
           element={
             <Layout>
               <MyTasks />
@@ -970,6 +987,24 @@ function App() {
           </Layout>
         } />
 
+        <Route path="/labour/project-active" element={
+          <Layout>
+            <ProjectActiveLabour />
+          </Layout>
+        } />
+
+        <Route path="/labour/record-working-time" element={
+          <Layout>
+            <RecordWorkingTime />
+          </Layout>
+        } />
+
+        <Route path="/labour/overtime-settings" element={
+          <Layout>
+            <OvertimeSettingsPage />
+          </Layout>
+        } />
+
         <Route path="/stock/requests" element={
           <Layout>
             <StockRequests />
@@ -997,6 +1032,36 @@ function App() {
         <Route path="/project-delays" element={
           <Layout>
             <ProjectDelays />
+          </Layout>
+        } />
+
+        <Route path="/procurement" element={
+          <Layout>
+            <Procurement />
+          </Layout>
+        } />
+
+        <Route path="/reports-hub" element={
+          <Layout>
+            <ReportsHub />
+          </Layout>
+        } />
+
+        <Route path="/stock/operations" element={
+          <Layout>
+            <StockOperations />
+          </Layout>
+        } />
+
+        <Route path="/labour/full-history" element={
+          <Layout>
+            <LabourFullHistory />
+          </Layout>
+        } />
+
+        <Route path="/audit-log" element={
+          <Layout>
+            <AuditLogPage />
           </Layout>
         } />
 

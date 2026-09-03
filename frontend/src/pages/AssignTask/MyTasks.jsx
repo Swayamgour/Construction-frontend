@@ -1,7 +1,12 @@
 import React, { useState } from "react";
 import {
-    useGetTaskByIdQuery,
+    useGetMyTasksQuery,
     useUpdateTaskStatusMutation,
+    useAcceptTaskMutation,
+    useRejectTaskMutation,
+    useSubmitTaskCompletionMutation,
+    useAddTaskCommentMutation,
+    useGetTaskActivityQuery,
 } from "../../Reduxe/Api";
 import {
     FiCheckCircle,
@@ -14,24 +19,29 @@ import {
     FiX,
     FiFileText,
     FiUser,
-    FiFolder
+    FiFolder,
+    FiMessageSquare
 } from "react-icons/fi";
-import { useParams } from "react-router-dom";
 
 export default function MyTasks() {
 
-    const { id } = useParams()
-    const { data, isLoading, refetch, isSuccess } = useGetTaskByIdQuery(id);
-
-    // console.log(data?.data)
+    // NOTE: this page previously called useGetTaskByIdQuery(id) with an
+    // :id route param — that fetches ONE task, not "my tasks", so the
+    // page rendered nothing for any real user. Fixed to use the actual
+    // GET /api/task/my-tasks endpoint via useGetMyTasksQuery().
+    const { data, isLoading, refetch } = useGetMyTasksQuery();
 
     const [updateStatus, { isLoading: updating }] = useUpdateTaskStatusMutation();
+    const [acceptTask] = useAcceptTaskMutation();
+    const [rejectTask] = useRejectTaskMutation();
+    const [submitCompletion] = useSubmitTaskCompletionMutation();
+    const [addComment] = useAddTaskCommentMutation();
 
     const [remark, setRemark] = useState("");
     const [selectedTask, setSelectedTask] = useState(null);
-    const [filter, setFilter] = useState("all");
-
-    const loggedUserId = localStorage.getItem("userId"); // Assuming you store user ID
+    const [activityTaskId, setActivityTaskId] = useState(null);
+    const [commentText, setCommentText] = useState("");
+    const { data: activityData, refetch: refetchActivity } = useGetTaskActivityQuery(activityTaskId, { skip: !activityTaskId });
 
     if (isLoading) return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
@@ -54,6 +64,46 @@ export default function MyTasks() {
             setRemark("");
         } catch (error) {
             console.error("Failed to update task status:", error);
+        }
+    };
+
+    const handleAccept = async (taskId) => {
+        try {
+            await acceptTask(taskId).unwrap();
+            refetch();
+        } catch (error) {
+            console.error("Failed to accept task:", error);
+        }
+    };
+
+    const handleReject = async (taskId) => {
+        const reason = window.prompt("Reason for rejecting this task?");
+        if (reason === null) return;
+        try {
+            await rejectTask({ id: taskId, reason }).unwrap();
+            refetch();
+        } catch (error) {
+            console.error("Failed to reject task:", error);
+        }
+    };
+
+    const handleSubmitCompletion = async (taskId) => {
+        try {
+            await submitCompletion(taskId).unwrap();
+            refetch();
+        } catch (error) {
+            console.error("Failed to submit completion:", error);
+        }
+    };
+
+    const handleAddComment = async () => {
+        if (!commentText.trim()) return;
+        try {
+            await addComment({ id: activityTaskId, comment: commentText }).unwrap();
+            setCommentText("");
+            refetchActivity();
+        } catch (error) {
+            console.error("Failed to add comment:", error);
         }
     };
 
@@ -215,7 +265,23 @@ export default function MyTasks() {
                                     </div>
 
                                     {/* Action Buttons */}
-                                    {task.status !== "Completed" && (
+                                    {task.status === "Assigned" && (
+                                        <div className="flex gap-3 pt-4 border-t border-gray-100">
+                                            <button
+                                                onClick={() => handleAccept(task._id)}
+                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors font-medium"
+                                            >
+                                                <FiCheck size={16} /> Accept
+                                            </button>
+                                            <button
+                                                onClick={() => handleReject(task._id)}
+                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors font-medium"
+                                            >
+                                                <FiX size={16} /> Reject
+                                            </button>
+                                        </div>
+                                    )}
+                                    {task.status !== "Completed" && task.status !== "Assigned" && (
                                         <div className="flex gap-3 pt-4 border-t border-gray-100">
                                             <button
                                                 onClick={() => handleStatusUpdate(task._id, "In Progress")}
@@ -232,6 +298,24 @@ export default function MyTasks() {
                                             >
                                                 <FiCheckCircle size={16} />
                                                 Complete
+                                            </button>
+                                        </div>
+                                    )}
+                                    {task.status !== "Assigned" && (
+                                        <div className="flex gap-3 pt-3">
+                                            {task.status === "In Progress" && (
+                                                <button
+                                                    onClick={() => handleSubmitCompletion(task._id)}
+                                                    className="flex-1 text-xs font-semibold text-indigo-600 hover:underline"
+                                                >
+                                                    Submit for Approval
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => setActivityTaskId(task._id)}
+                                                className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold text-gray-500 hover:text-gray-800"
+                                            >
+                                                <FiMessageSquare size={13} /> Comments
                                             </button>
                                         </div>
                                     )}
@@ -252,22 +336,59 @@ export default function MyTasks() {
                 </div>
 
                 {/* Empty State */}
-                {filteredTasks.length === 0 && (
+                {(data?.data || []).length === 0 && (
                     <div className="text-center py-16">
                         <div className="bg-white rounded-2xl shadow-sm border p-12 max-w-md mx-auto">
                             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
                                 <FiFileText className="text-gray-400 text-3xl" />
                             </div>
                             <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                                {myTasks?.length === 0 ? "No Tasks Assigned" : "No Tasks Found"}
+                                No Tasks Assigned
                             </h3>
                             <p className="text-gray-600 mb-6">
-                                {myTasks?.length === 0
-                                    ? "You don't have any tasks assigned to you yet."
-                                    : "No tasks match your current filter criteria."
-                                }
+                                You don't have any tasks assigned to you yet.
                             </p>
                             <div className="w-24 h-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full mx-auto"></div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Comments / Activity Modal */}
+                {activityTaskId && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] flex flex-col">
+                            <div className="flex justify-between items-center p-6 border-b border-gray-200">
+                                <h3 className="text-lg font-bold text-gray-900">Task Activity</h3>
+                                <button onClick={() => setActivityTaskId(null)} className="text-gray-400 hover:text-gray-700">
+                                    <FiX size={20} />
+                                </button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-6 space-y-3">
+                                {(activityData?.data || []).length === 0 && (
+                                    <p className="text-sm text-gray-400 text-center">No activity yet</p>
+                                )}
+                                {(activityData?.data || []).map((a) => (
+                                    <div key={a._id} className="bg-gray-50 rounded-xl p-3 text-sm">
+                                        <p className="font-medium text-gray-800">{a.userId?.name || "User"}</p>
+                                        <p className="text-gray-600">{a.comment || a.action}</p>
+                                        <p className="text-xs text-gray-400 mt-1">{a.createdAt ? new Date(a.createdAt).toLocaleString() : ""}</p>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="p-4 border-t border-gray-200 flex gap-2">
+                                <input
+                                    value={commentText}
+                                    onChange={(e) => setCommentText(e.target.value)}
+                                    placeholder="Add a comment…"
+                                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                                />
+                                <button
+                                    onClick={handleAddComment}
+                                    className="bg-blue-900 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg"
+                                >
+                                    Send
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}

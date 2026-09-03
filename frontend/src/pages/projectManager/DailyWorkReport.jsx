@@ -130,7 +130,7 @@ export default function DailyWorkReport() {
                                     required
                                 >
                                     <option value="">Select project</option>
-                                    {projects.map((p) => (
+                                    {projects?.data?.map((p) => (
                                         <option key={p._id} value={p._id}>
                                             {p.name}
                                         </option>

@@ -1,7 +1,140 @@
 import MachineOperatorLog from "../models/MachineOperatorLog.js";
+import MachineAssignment from "../models/MachineAssignment.js";
 import { getEffectiveOvertimeSettings, calculateWorkingTime } from "../utils/overtime.js";
 import { success, fail, getPagination, buildPagination, getDateRangeFilter } from "../utils/apiResponse.js";
 import { logAudit } from "../utils/audit.js";
+import { notifyRoles } from "../utils/notify.js";
+
+/**
+ * ============================================================
+ *  OPERATOR ASSIGNMENT LIFECYCLE
+ * ============================================================
+ * MachineOperatorLog (below) records individual WORKING DAYS. These four
+ * functions are the separate, higher-level "who is the assigned operator
+ * on this machine assignment right now" lifecycle the spec asks for:
+ * assign / change / remove, each preserving a permanent history entry —
+ * matching the same pattern used for Labour transfer history.
+ * All four act on a MachineAssignment record (found by :assignmentId).
+ * ============================================================
+ */
+
+/** POST /api/machinery/assignments/:assignmentId/operator */
+export const assignOperatorToMachine = async (req, res) => {
+    try {
+        const { operatorId, reason } = req.body;
+        if (!operatorId) return fail(res, 400, "operatorId is required");
+
+        const assignment = await MachineAssignment.findById(req.params.assignmentId);
+        if (!assignment) return fail(res, 404, "Machine assignment not found");
+        if (assignment.releaseDate) return fail(res, 400, "This machine assignment has already been released");
+        if (assignment.operatorId) {
+            return fail(res, 400, "This machine already has an operator assigned. Use the change-operator endpoint to replace them.");
+        }
+
+        assignment.operatorId = operatorId;
+        assignment.operatorHistory.push({
+            action: "Assigned",
+            previousOperatorId: null,
+            newOperatorId: operatorId,
+            reason: reason || "",
+            changedBy: req.user.id,
+            changedAt: new Date(),
+        });
+        await assignment.save();
+
+        await logAudit({ module: "MachineOperatorLog", entityId: assignment._id, action: "operator_assigned", performedBy: req.user.id, remarks: reason || "" });
+        await notifyRoles({ roles: ["admin", "manager"], title: "Operator assigned to machine", message: `Operator assigned on machine assignment ${assignment._id}`, module: "Machinery", referenceType: "MachineAssignment", referenceId: assignment._id });
+
+        return success(res, 200, "Operator assigned", assignment);
+    } catch (error) {
+        return fail(res, 500, "Error assigning operator", error);
+    }
+};
+
+/** PATCH /api/machinery/assignments/:assignmentId/operator/change */
+export const changeOperator = async (req, res) => {
+    try {
+        const { operatorId, reason } = req.body;
+        if (!operatorId) return fail(res, 400, "operatorId (new operator) is required");
+        if (!reason || !String(reason).trim()) return fail(res, 400, "A reason is required when changing the operator");
+
+        const assignment = await MachineAssignment.findById(req.params.assignmentId);
+        if (!assignment) return fail(res, 404, "Machine assignment not found");
+        if (assignment.releaseDate) return fail(res, 400, "This machine assignment has already been released");
+        if (String(assignment.operatorId) === String(operatorId)) {
+            return fail(res, 400, "New operator is the same as the current operator");
+        }
+
+        const previousOperatorId = assignment.operatorId || null;
+        assignment.operatorId = operatorId;
+        assignment.operatorHistory.push({
+            action: "Changed",
+            previousOperatorId,
+            newOperatorId: operatorId,
+            reason,
+            changedBy: req.user.id,
+            changedAt: new Date(),
+        });
+        await assignment.save();
+
+        await logAudit({ module: "MachineOperatorLog", entityId: assignment._id, action: "operator_changed", performedBy: req.user.id, remarks: reason });
+        await notifyRoles({ roles: ["admin", "manager"], title: "Machine operator changed", message: reason, module: "Machinery", referenceType: "MachineAssignment", referenceId: assignment._id });
+
+        return success(res, 200, "Operator changed", assignment);
+    } catch (error) {
+        return fail(res, 500, "Error changing operator", error);
+    }
+};
+
+/** PATCH /api/machinery/assignments/:assignmentId/operator/remove */
+export const removeOperator = async (req, res) => {
+    try {
+        const { reason } = req.body;
+        const assignment = await MachineAssignment.findById(req.params.assignmentId);
+        if (!assignment) return fail(res, 404, "Machine assignment not found");
+        if (!assignment.operatorId) return fail(res, 400, "This machine assignment has no operator to remove");
+
+        const previousOperatorId = assignment.operatorId;
+        assignment.operatorId = null;
+        assignment.operatorHistory.push({
+            action: "Removed",
+            previousOperatorId,
+            newOperatorId: null,
+            reason: reason || "",
+            changedBy: req.user.id,
+            changedAt: new Date(),
+        });
+        await assignment.save();
+
+        await logAudit({ module: "MachineOperatorLog", entityId: assignment._id, action: "operator_removed", performedBy: req.user.id, remarks: reason || "" });
+
+        return success(res, 200, "Operator removed", assignment);
+    } catch (error) {
+        return fail(res, 500, "Error removing operator", error);
+    }
+};
+
+/** GET /api/machinery/assignments/:assignmentId/operator/history */
+export const getOperatorAssignmentHistory = async (req, res) => {
+    try {
+        const assignment = await MachineAssignment.findById(req.params.assignmentId)
+            .populate("operatorHistory.previousOperatorId", "name role")
+            .populate("operatorHistory.newOperatorId", "name role")
+            .populate("operatorHistory.changedBy", "name role")
+            .populate("machineId", "machineNumber machineType")
+            .populate("operatorId", "name role");
+        if (!assignment) return fail(res, 404, "Machine assignment not found");
+
+        return success(res, 200, "Operator assignment history fetched", {
+            machineId: assignment.machineId,
+            projectId: assignment.projectId,
+            currentOperator: assignment.operatorId,
+            history: assignment.operatorHistory,
+        });
+    } catch (error) {
+        return fail(res, 500, "Error fetching operator assignment history", error);
+    }
+};
 
 /**
  * POST /api/machinery/:id/operator

@@ -208,7 +208,7 @@ export default function PMDashboard() {
                             </div>
                         ) : (
                             <div className="grid gap-4">
-                                {filteredProjects.map(p => (
+                                {filteredprojects?.data?.map(p => (
                                     <div onClick={() => navigate("/DashboardProject", { state: { project: p } })} key={p._id} className="group p-6 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-300 bg-gradient-to-r from-white to-gray-50/50">
                                         <div className="flex flex-col lg:flex-row lg:items-center justify-between">
                                             <div className="flex-1 mb-4 lg:mb-0">

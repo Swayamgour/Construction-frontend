@@ -208,7 +208,7 @@ export default function StockOverview() {
               onChange={handleProjectChange}
               className="px-4 py-3 border-2 rounded-xl bg-gray-50 text-gray-800"
             >
-              {projects?.map((p) => (
+              {projects?.data?.map((p) => (
                 <option key={p._id} value={p._id}>
                   {p.projectName}
                 </option>

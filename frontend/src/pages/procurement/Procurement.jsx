@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import toast from "react-hot-toast";
 import { ShoppingCart, Plus, X, Ban } from "lucide-react";
 import {
-    useListProcurementsQuery,
+    useGetProcurementsQuery,
     useCreateProcurementMutation,
     useUpdateProcurementStatusMutation,
     useCancelProcurementMutation,
@@ -78,7 +78,7 @@ const NewProcurementModal = ({ onClose }) => {
 
 export default function Procurement() {
     const { role } = CheckRole();
-    const { data, isLoading } = useListProcurementsQuery();
+    const { data, isLoading } = useGetProcurementsQuery();
     const [updateStatus] = useUpdateProcurementStatusMutation();
     const [cancelProcurement] = useCancelProcurementMutation();
     const [showNew, setShowNew] = useState(false);

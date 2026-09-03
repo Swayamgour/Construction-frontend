@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useGetAllMachinesQuery } from "../../Reduxe/Api";
+import MaintenanceDueBanner from "./MaintenanceDueBanner";
 
 export default function MachineList() {
     const [machines, setMachines] = useState([]);
@@ -91,6 +92,8 @@ export default function MachineList() {
                     </button>
                 </div>
             </div>
+
+            <MaintenanceDueBanner />
 
             {isSuccess && machines.length === 0 ? (
                 <div className="text-center py-10">

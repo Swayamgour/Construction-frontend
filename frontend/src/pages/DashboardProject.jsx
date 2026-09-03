@@ -166,7 +166,7 @@ export default function DashboardProject() {
                     <ActionCard
                         title="View Tasks"
                         icon={<FaTasks />}
-                        onClick={() => navigate(`/MyTasks/${projectById?._id}`)}
+                        onClick={() => navigate(`/MyTasks`)}
                         color="from-blue-500 to-cyan-500"
                     />
                     <ActionCard

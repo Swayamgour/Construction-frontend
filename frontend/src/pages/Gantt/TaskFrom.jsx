@@ -160,7 +160,7 @@ function TaskFrom() {
                 <Select
                     styles={customSelectStyles}
                     options={
-                        projectList?.map((p) => ({
+                        projectList?.data?.map((p) => ({
                             value: p._id,
                             label: p.projectName,
                             subLabel: p.location || p.clientName || ""
@@ -486,7 +486,7 @@ function TaskFrom() {
                         <div className="text-sm text-gray-500">
                             <span className="font-medium">Project:</span>
                             <span className="ml-2 px-3 py-1 bg-gray-100 rounded-lg">
-                                {projectList?.find(p => p._id === selectedProjectId)?.projectName || "Not selected"}
+                                {projectList?.data?.find(p => p._id === selectedProjectId)?.projectName || "Not selected"}
                             </span>
                         </div>
 

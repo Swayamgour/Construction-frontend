@@ -4,7 +4,7 @@ import {
   LayoutDashboard, UserPlus, Layers, Store, ClipboardList, Users,
   Factory, BarChart2, Boxes, ChevronDown, ArrowRightLeft,
   Clock, FileStack, Truck, CalendarCheck, AlertTriangle,
-  PanelLeftClose, PanelLeftOpen, LogOut, X,
+  PanelLeftClose, PanelLeftOpen, LogOut, X, History, ShieldCheck,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -13,19 +13,19 @@ import toast from "react-hot-toast";
 // from the old flat list, so permissions behave the same as before —
 // only the presentation changed.
 const NAV_GROUPS = [
-  {
-    label: "Overview",
-    items: [
-      { name: "Dashboard", icon: LayoutDashboard, path: "/dashboard", roles: ["admin", "manager", "supervisor", "storekeeper", "drawing_manager"] },
-      { name: "Manager Dashboard", icon: BarChart2, path: "/pm/dashboard", roles: ["manager"] },
-    ],
-  },
+  // {
+  //   label: "Overview",
+  //   items: [
+  //     { name: "Dashboard", icon: LayoutDashboard, path: "/dashboard", roles: ["admin", "manager", "supervisor", "storekeeper", "drawing_manager"] },
+  //     { name: "Manager Dashboard", icon: BarChart2, path: "/pm/dashboard", roles: ["manager"] },
+  //   ],
+  // },
   {
     label: "Projects",
     items: [
       { name: "All Projects", icon: Layers, path: "/Product", roles: ["admin"] },
       { name: "My Projects", icon: Layers, path: "/AssignProject", roles: ["manager", "supervisor"] },
-      { name: "Gantt Chart", icon: ClipboardList, path: "/AddGanttTask", roles: ["admin", "manager", "supervisor"] },
+      // { name: "Gantt Chart", icon: ClipboardList, path: "/AddGanttTask", roles: ["admin", "manager", "supervisor"] },
     ],
   },
   {
@@ -36,7 +36,11 @@ const NAV_GROUPS = [
       { name: "Attendance Labour", icon: ClipboardList, path: "/AttendanceLabour", roles: ["admin", "manager"] },
       { name: "Approve Attendance", icon: ClipboardList, path: "/employee/pending", roles: ["admin"] },
       { name: "Labour Transfer", icon: ArrowRightLeft, path: "/labour/transfer", roles: ["admin", "manager", "supervisor"] },
+      { name: "Record Working Time", icon: Clock, path: "/labour/record-working-time", roles: ["admin", "manager", "supervisor"] },
       { name: "Labour Overtime", icon: Clock, path: "/labour/overtime", roles: ["admin", "manager", "supervisor"] },
+      { name: "Project Active Labour", icon: Users, path: "/labour/project-active", roles: ["admin", "manager", "supervisor"] },
+      { name: "Labour Full History", icon: History, path: "/labour/full-history", roles: ["admin", "manager", "supervisor"] },
+      { name: "Overtime Settings", icon: Clock, path: "/labour/overtime-settings", roles: ["admin", "manager"] },
     ],
   },
   {
@@ -49,6 +53,8 @@ const NAV_GROUPS = [
       // it doesn't look like two different features.
       { name: "Material Approval", icon: BarChart2, path: "/MaterialApproval", roles: ["admin", "manager"] },
       { name: "Stock Requests", icon: Boxes, path: "/stock/requests", roles: ["admin", "manager", "supervisor", "storekeeper"] },
+      { name: "Procurement", icon: Store, path: "/procurement", roles: ["admin", "manager", "storekeeper"] },
+      { name: "Stock Operations", icon: ArrowRightLeft, path: "/stock/operations", roles: ["admin", "manager", "storekeeper"] },
     ],
   },
   {
@@ -63,6 +69,7 @@ const NAV_GROUPS = [
     items: [
       { name: "Vendor Manage", icon: Store, path: "/VendorManagement", roles: ["admin", "manager"] },
       { name: "Assign Task", icon: ClipboardList, path: "/TaskList", roles: ["admin", "manager"] },
+      { name: "My Tasks", icon: ClipboardList, path: "/MyTasks", roles: ["admin", "manager", "supervisor", "storekeeper", "drawing_manager"] },
     ],
   },
   {
@@ -73,10 +80,17 @@ const NAV_GROUPS = [
       { name: "Project Delays", icon: AlertTriangle, path: "/project-delays", roles: ["admin", "manager", "supervisor"] },
     ],
   },
+  // {
+  //   label: "Reports",
+  //   items: [
+  //     { name: "Reports & Dashboard", icon: BarChart2, path: "/reports-hub", roles: ["admin", "manager", "supervisor", "storekeeper", "accountant"] },
+  //   ],
+  // },
   {
     label: "Administration",
     items: [
       { name: "Create Role", icon: UserPlus, path: "/ViewUser", roles: ["admin"] },
+      { name: "Audit Log", icon: ShieldCheck, path: "/audit-log", roles: ["admin", "manager"] },
     ],
   },
 ];

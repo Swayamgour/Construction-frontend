@@ -20,6 +20,9 @@ const auditLogSchema = new mongoose.Schema(
                 "Procurement",
                 "StockReceipt",
                 "StockLedger",
+                "GRN",
+                "PurchaseOrder",
+                "Inventory",
                 "DrawingRequest",
                 "DrawingVersion",
                 "MachineRequest",
@@ -35,6 +38,7 @@ const auditLogSchema = new mongoose.Schema(
         action: { type: String, required: true }, // e.g. "created", "approved", "transferred"
         performedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
         remarks: { type: String, default: "" },
+        projectId: { type: mongoose.Schema.Types.ObjectId, ref: "Project", default: null, index: true },
         meta: { type: mongoose.Schema.Types.Mixed, default: {} },
     },
     { timestamps: true }

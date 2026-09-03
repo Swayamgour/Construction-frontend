@@ -18,7 +18,11 @@ const grnItemSchema = new mongoose.Schema({
 });
 
 const grnSchema = new mongoose.Schema({
-    materialRequestId: { type: mongoose.Schema.Types.ObjectId, ref: "MaterialRequest", required: true },
+    materialRequestId: { type: mongoose.Schema.Types.ObjectId, ref: "MaterialRequest", default: null },
+    purchaseOrderId: { type: mongoose.Schema.Types.ObjectId, ref: "PurchaseOrder", default: null, index: true },
+    stockRequestId: { type: mongoose.Schema.Types.ObjectId, ref: "StockRequest", default: null, index: true },
+    procurementId: { type: mongoose.Schema.Types.ObjectId, ref: "Procurement", default: null },
+    projectId: { type: mongoose.Schema.Types.ObjectId, ref: "Project", default: null, index: true },
 
     poNumber: String,
     deliveryChallan: String,

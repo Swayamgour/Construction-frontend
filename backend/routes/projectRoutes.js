@@ -15,6 +15,7 @@ import {
 
 import { auth } from "../middleware/auth.js";
 import { roleCheck } from "../middleware/role.js";
+import { checkProjectAccess } from "../middleware/projectAccess.js";
 import upload from "../middleware/upload.js";
 
 
@@ -57,7 +58,7 @@ router.get("/assign/my", auth, getMyProjects);
 
 
 // GET SINGLE PROJECT
-router.get("/:id", auth, getProjectById);
+router.get("/:id", auth, checkProjectAccess("id"), getProjectById);
 
 // DELETE PROJECT (admin only)
 router.delete("/:id", auth, roleCheck("admin"), deleteProject);

@@ -145,13 +145,22 @@ export const projectDashboard = async (req, res) => {
         const { projectId } = req.params;
         const LabourAssignment = (await import("../models/LabourAssignment.js")).default;
         const MachineRequest = (await import("../models/MachineRequest.js")).default;
+        const StockRequest = (await import("../models/StockRequest.js")).default;
 
-        const [activeDelays, resolvedDelaysCount, latestEOD, activeLabourCount, activeMachineCount] = await Promise.all([
+        const [activeDelays, resolvedDelaysCount, latestEOD, activeLabourCount, activeMachineCount, materialShortages] = await Promise.all([
             ProjectDelay.find({ projectId, status: "Active" }).populate("delayType", "name").sort({ delayDate: -1 }),
             ProjectDelay.countDocuments({ projectId, status: "Resolved" }),
             EODReport.findOne({ projectId }).sort({ date: -1 }),
             LabourAssignment.countDocuments({ projectId, status: "Active" }),
             MachineRequest.countDocuments({ projectId, status: "ACTIVE" }),
+            // ⭐ "materialShortages" from the follow-up audit's expected dashboard
+            // shape — stock requests on this project that are still waiting
+            // on material (not yet fully fulfilled) are the closest existing
+            // signal for "shortage" without inventing a new demand-planning
+            // model that doesn't exist in this schema.
+            StockRequest.find({ projectId, status: { $in: ["PENDING_ADMIN_REVIEW", "APPROVED_TRANSFER", "APPROVED_PROCUREMENT", "PARTIALLY_FULFILLED"] } })
+                .select("materialName quantity fulfilledQty status")
+                .sort({ createdAt: -1 }),
         ]);
 
         const totalDelayDays = activeDelays.reduce((sum, d) => sum + (d.estimatedDelayDays || 0), 0);
@@ -160,9 +169,14 @@ export const projectDashboard = async (req, res) => {
             activeDelays,
             resolvedDelaysCount,
             totalActiveDelayDays: totalDelayDays,
+            delayDays: totalDelayDays,
+            criticalIssues: activeDelays.length,
             latestEODStatus: latestEOD ? { date: latestEOD.date, status: latestEOD.status, issues: latestEOD.issues } : null,
+            labourAvailable: activeLabourCount,
             activeLabourCount,
+            machinesAvailable: activeMachineCount,
             activeMachineCount,
+            materialShortages,
         });
     } catch (error) {
         return fail(res, 500, "Error building project dashboard", error);

@@ -29,7 +29,7 @@ const DashboardVendor = () => {
 
     console.log(data)
 
-    const vendorList = data || [];
+    const vendorList = data?.data || [];
 
     // ✅ Search filter
     const filteredVendors = vendorList.filter((vendor) => {

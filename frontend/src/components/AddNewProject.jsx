@@ -53,7 +53,7 @@ function AddNewProject({ isOpen, onClose }) {
 
                 {/* Project List */}
                 <div className="flex-1 overflow-y-auto border rounded-md">
-                    {filteredProjects.map((project, index) => (
+                    {filteredprojects?.data?.map((project, index) => (
                         <div
                             key={index}
                             className="flex items-center px-4 py-2 border-b hover:bg-gray-50"

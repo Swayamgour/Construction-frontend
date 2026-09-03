@@ -27,6 +27,11 @@ const maintenanceSchema = new mongoose.Schema({
   afterImages: [{ type: String }],
   nextMaintenanceDate: { type: Date, default: null },
   machineMeterReading: { type: Number, default: null },
+  // ⭐ Meter-based maintenance threshold (follow-up audit gap): the meter
+  // reading at which the NEXT service falls due, e.g. "service again at
+  // 5000 hours". Additive/optional — date-based maintenance keeps working
+  // unchanged when this is left unset.
+  nextServiceMeterReading: { type: Number, default: null },
   status: {
     type: String,
     enum: ["Reported", "Scheduled", "InProgress", "Completed", "Cancelled"],

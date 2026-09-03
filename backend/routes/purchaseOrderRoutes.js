@@ -1,0 +1,17 @@
+import express from "express";
+import { auth } from "../middleware/auth.js";
+import { roleCheck } from "../middleware/role.js";
+import { checkProjectAccess, resolveProjectFrom } from "../middleware/projectAccess.js";
+import PurchaseOrder from "../models/PurchaseOrder.js";
+import { createPurchaseOrder,listPurchaseOrders,getPurchaseOrder,updatePurchaseOrder,submitPurchaseOrder,approvePurchaseOrder,orderPurchaseOrder,cancelPurchaseOrder,closePurchaseOrder } from "../controllers/purchaseOrderController.js";
+const router=express.Router(); const poProject=resolveProjectFrom(PurchaseOrder,{field:"projectId"});
+router.post("/",auth,roleCheck("admin","manager"),checkProjectAccess(),createPurchaseOrder);
+router.get("/",auth,roleCheck("admin","manager","accountant","storekeeper"),listPurchaseOrders);
+router.get("/:id",auth,roleCheck("admin","manager","accountant","storekeeper"),checkProjectAccess(poProject),getPurchaseOrder);
+router.patch("/:id",auth,roleCheck("admin","manager"),checkProjectAccess(poProject),updatePurchaseOrder);
+router.patch("/:id/submit",auth,roleCheck("admin","manager"),checkProjectAccess(poProject),submitPurchaseOrder);
+router.patch("/:id/approve",auth,roleCheck("admin"),checkProjectAccess(poProject),approvePurchaseOrder);
+router.patch("/:id/order",auth,roleCheck("admin","manager"),checkProjectAccess(poProject),orderPurchaseOrder);
+router.patch("/:id/cancel",auth,roleCheck("admin","manager"),checkProjectAccess(poProject),cancelPurchaseOrder);
+router.patch("/:id/close",auth,roleCheck("admin","manager"),checkProjectAccess(poProject),closePurchaseOrder);
+export default router;

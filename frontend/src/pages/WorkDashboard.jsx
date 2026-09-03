@@ -305,7 +305,7 @@ const WorkDashboard = () => {
             {/* Work Cards Section */}
             {viewMode === "grid" ? (
                 <div className="grid lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-                    {filteredProjects.map((work) => (
+                    {filteredProjects?.map((work) => (
                         <div
                             key={work.id}
                             className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-blue-200 cursor-pointer transform hover:-translate-y-1"
@@ -408,7 +408,7 @@ const WorkDashboard = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredProjects.map((work) => (
+                            {filteredProjects?.map((work) => (
                                 <tr
                                     key={work.id}
                                     className="border-b border-gray-100 hover:bg-blue-50 cursor-pointer transition-colors"

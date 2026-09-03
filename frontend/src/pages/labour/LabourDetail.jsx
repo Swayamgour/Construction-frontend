@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGetLabourByIdQuery } from "../../Reduxe/Api";
 import LabourForm from "./LabourForm";
@@ -21,20 +21,97 @@ import {
   CheckCircle,
   XCircle,
   PlayCircle,
-  Square
+  Square,
+  Timer,
+  Building2,
+  Inbox
 } from "lucide-react";
 import { BiRupee } from "react-icons/bi";
+
+/** "HH:mm" strings (BulkAttendance/SingleMark flow) and full ISO datetimes
+ *  (selfie punch-in flow) both show up in timeIn/timeOut — normalize both. */
+const formatTime = (value) => {
+  if (!value) return "—";
+  if (/^\d{1,2}:\d{2}$/.test(value)) return value;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+};
+
+const formatDate = (value) => {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+const toCsvValue = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
 const LabourDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [projectFilter, setProjectFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const { data, isLoading, isError } = useGetLabourByIdQuery(id);
 
-  // Mock attendance data - replace with actual API data
-
   const labour = data;
+
+  // attendanceHistory carries a raw projectId — resolve names from
+  // assignedProjects (the only place project names are populated on this
+  // response) so past project stints still show a readable name even
+  // after the labour has since moved on.
+  const projectNameById = useMemo(() => {
+    const map = new Map();
+    (labour?.assignedProjects || []).forEach((p) => map.set(p._id, p.projectName));
+    return map;
+  }, [labour]);
+
+  const projectOptions = useMemo(() => {
+    const map = new Map(projectNameById);
+    (labour?.attendanceHistory || []).forEach((h) => {
+      if (!map.has(h.projectId)) map.set(h.projectId, null);
+    });
+    return Array.from(map.entries()).map(([pid, name]) => ({ id: pid, name: name || "Unknown Project" }));
+  }, [labour, projectNameById]);
+
+  const sortedHistory = useMemo(
+    () => [...(labour?.attendanceHistory || [])].sort((a, b) => new Date(b.date) - new Date(a.date)),
+    [labour]
+  );
+
+  const filteredHistory = useMemo(() => {
+    return sortedHistory.filter((h) => {
+      if (projectFilter !== "all" && h.projectId !== projectFilter) return false;
+      if (statusFilter !== "all" && h.status !== statusFilter) return false;
+      return true;
+    });
+  }, [sortedHistory, projectFilter, statusFilter]);
+
+  const totalOvertimeHours = useMemo(
+    () => (labour?.attendanceHistory || []).reduce((sum, h) => sum + (h.overtimeHours || 0), 0),
+    [labour]
+  );
+
+  const downloadCsv = () => {
+    const header = ["Date", "Project", "Status", "Time In", "Time Out", "Overtime Hours"];
+    const rows = filteredHistory.map((h) => [
+      formatDate(h.date),
+      projectNameById.get(h.projectId) || "Unknown Project",
+      h.status,
+      formatTime(h.timeIn),
+      formatTime(h.timeOut),
+      h.overtimeHours || 0,
+    ]);
+    const csv = [header, ...rows].map((r) => r.map(toCsvValue).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${labour?.name || "labour"}-attendance.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   if (isLoading)
     return (
@@ -81,6 +158,7 @@ const LabourDetail = () => {
     switch (status) {
       case "Present": return "text-green-600 bg-green-50";
       case "Absent": return "text-red-600 bg-red-50";
+      case "Half-Day":
       case "Half Day": return "text-orange-600 bg-orange-50";
       default: return "text-gray-600 bg-gray-50";
     }
@@ -248,7 +326,7 @@ const LabourDetail = () => {
                       <p className="text-sm text-gray-500 mb-2">Assigned Projects</p>
                       {labour.assignedProjects?.length ? (
                         <div className="flex flex-wrap gap-2">
-                          {labour.assignedProjects?.map((p, i) => (
+                          {labour.assigned.map((p, i) => (
                             <span key={i} className="px-3 py-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs rounded-lg font-medium">
                               {p.projectName || "Project"}
                             </span>
@@ -265,7 +343,7 @@ const LabourDetail = () => {
 
             {activeTab === "attendance" && (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
 
                   {/* ✅ Present */}
                   <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-2xl border border-green-200">
@@ -303,8 +381,114 @@ const LabourDetail = () => {
                     <p className="text-xs text-blue-600">Attendance Entries</p>
                   </div>
 
+                  {/* ⏱ Overtime */}
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-2xl border border-purple-200">
+                    <p className="text-sm text-purple-600 font-medium">Overtime</p>
+                    <p className="text-2xl font-bold text-purple-700">
+                      {totalOvertimeHours.toFixed(2)}h
+                    </p>
+                    <p className="text-xs text-purple-600">Across All Records</p>
+                  </div>
+
                 </div>
 
+                {/* 🔍 Filters + Export */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+                  <div className="flex items-center gap-2 text-gray-500 text-sm">
+                    <Filter size={15} /> Filter:
+                  </div>
+                  <select
+                    value={projectFilter}
+                    onChange={(e) => setProjectFilter(e.target.value)}
+                    className="border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
+                  >
+                    <option value="all">All Projects</option>
+                    {projectOptions.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="Present">Present</option>
+                    <option value="Absent">Absent</option>
+                    <option value="Half-Day">Half-Day</option>
+                  </select>
+
+                  <button
+                    onClick={downloadCsv}
+                    disabled={filteredHistory.length === 0}
+                    className="sm:ml-auto flex items-center gap-2 text-sm px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                  >
+                    <Download size={15} /> Export CSV
+                  </button>
+                </div>
+
+                {/* 🗓 Attendance History Table */}
+                {filteredHistory.length === 0 ? (
+                  <div className="text-center py-16 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                    <Inbox className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 font-medium">No attendance records found</p>
+                    <p className="text-gray-400 text-sm">Try a different project or status filter.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-gray-200">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                        <tr>
+                          <th className="text-left font-medium px-4 py-3">Date</th>
+                          <th className="text-left font-medium px-4 py-3">Project</th>
+                          <th className="text-left font-medium px-4 py-3">Status</th>
+                          <th className="text-left font-medium px-4 py-3">Time In</th>
+                          <th className="text-left font-medium px-4 py-3">Time Out</th>
+                          <th className="text-left font-medium px-4 py-3">Overtime</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredHistory.map((h) => (
+                          <tr key={h._id} className="border-t border-gray-100 hover:bg-gray-50/60">
+                            <td className="px-4 py-3 flex items-center gap-2 text-gray-700">
+                              <Calendar size={14} className="text-gray-400" />
+                              {formatDate(h.date)}
+                            </td>
+                            <td className="px-4 py-3 text-gray-700">
+                              <span className="flex items-center gap-1.5">
+                                <Building2 size={14} className="text-gray-400" />
+                                {projectNameById.get(h.projectId) || "Unknown Project"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(h.status)}`}>
+                                {h.status === "Present" ? <CheckCircle size={12} /> : h.status === "Absent" ? <XCircle size={12} /> : <Clock size={12} />}
+                                {h.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-gray-600 flex items-center gap-1.5">
+                              <PlayCircle size={13} className="text-gray-400" /> {formatTime(h.timeIn)}
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">
+                              <span className="flex items-center gap-1.5">
+                                <Square size={12} className="text-gray-400" /> {formatTime(h.timeOut)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              {h.overtimeHours > 0 ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700">
+                                  <Timer size={12} /> {h.overtimeHours}h
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-xs">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </>
             )}
 

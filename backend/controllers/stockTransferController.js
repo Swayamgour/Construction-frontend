@@ -81,7 +81,7 @@ export const createStockTransfer = async (req, res) => {
             transfer.destinationStockBalanceAfter = credit.projectBalance;
             await transfer.save({ session });
 
-            request.status = quantity >= request.quantity ? "APPROVED_TRANSFER" : "PARTIALLY_FULFILLED";
+            request.status = "APPROVED_TRANSFER";
             request.updatedBy = req.user.id;
             await request.save({ session });
         });
@@ -115,11 +115,14 @@ export const confirmTransferReceipt = async (req, res) => {
         transfer.receivedBy = req.user.id;
         await transfer.save();
 
-        const request = await StockRequest.findByIdAndUpdate(
-            transfer.stockRequestId,
-            { status: "FULFILLED", updatedBy: req.user.id },
-            { new: true }
-        );
+        const request = await StockRequest.findById(transfer.stockRequestId);
+        if (request) {
+            const fulfilledQty = Math.min(Number(request.quantity), Number(request.fulfilledQty || 0) + Number(transfer.transferredQuantity || 0));
+            request.fulfilledQty = fulfilledQty;
+            request.status = fulfilledQty >= Number(request.quantity) ? "FULFILLED" : "PARTIALLY_FULFILLED";
+            request.updatedBy = req.user.id;
+            await request.save();
+        }
 
         await logAudit({ module: "StockTransfer", entityId: transfer._id, action: "received", performedBy: req.user.id });
         if (request) {
@@ -209,6 +212,9 @@ export const listStockTransfers = async (req, res) => {
         const { sourceProjectId, destinationProjectId, status } = req.query;
 
         const filter = {};
+        if (req.user.role !== "admin" && Array.isArray(req.user.assignedProjects)) {
+            filter.$or = [{ sourceProjectId: { $in: req.user.assignedProjects } }, { destinationProjectId: { $in: req.user.assignedProjects } }];
+        }
         if (sourceProjectId) filter.sourceProjectId = sourceProjectId;
         if (destinationProjectId) filter.destinationProjectId = destinationProjectId;
         if (status) filter.status = status;

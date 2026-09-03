@@ -119,7 +119,7 @@ const DrawingRequests = () => {
                 <form onSubmit={handleCreate} className="bg-white rounded-xl shadow p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <select className="border p-2 rounded-lg" value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })} required>
                         <option value="">Select Project</option>
-                        {projects.map((p) => <option key={p._id} value={p._id}>{p.projectName}</option>)}
+                        {projects?.map((p) => <option key={p._id} value={p._id}>{p.projectName}</option>)}
                     </select>
                     <input type="text" placeholder="Drawing Category (e.g. Structural)" className="border p-2 rounded-lg" value={form.drawingCategory} onChange={(e) => setForm({ ...form, drawingCategory: e.target.value })} required />
                     <input type="text" placeholder="Drawing Title" className="border p-2 rounded-lg md:col-span-2" value={form.drawingTitle} onChange={(e) => setForm({ ...form, drawingTitle: e.target.value })} required />

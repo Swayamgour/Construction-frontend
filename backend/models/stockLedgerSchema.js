@@ -25,6 +25,13 @@ const stockLedgerSchema = new mongoose.Schema({
     qtyOut: { type: Number, default: 0 },
     balanceQty: { type: Number, default: 0 },
 
+    // ⭐ Additive, optional — used by Opening Stock entries (rate at which
+    // opening quantity was valued, and a backdated entryDate when the
+    // opening balance is recorded after the fact). Other transaction
+    // types simply leave these unset.
+    rate: { type: Number },
+    entryDate: { type: Date },
+
     remarks: { type: String },
 
 }, { timestamps: true });

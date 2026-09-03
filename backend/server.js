@@ -40,6 +40,7 @@ import projectDelayRoutes from "./routes/projectDelayRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import auditRoutes from "./routes/auditRoutes.js";
 import erpReportRoutes from "./routes/erpReportRoutes.js";
+import purchaseOrderRoutes from "./routes/purchaseOrderRoutes.js";
 
 
 
@@ -57,6 +58,7 @@ app.use("/api/item", itemRoutes);
 app.use("/api/assignLabour", labourRoutes);
 app.use("/api/mr", materialRequestRoutes);
 app.use("/api/attendance", attendanceRoutes);
+app.use("/api/labour", labourManagementRoutes);
 app.use("/api/machine/allocation", machineAllocationRoutes);
 app.use("/api/machine/usage", machineUsageRoutes);
 app.use("/api/task", taskRoutes);
@@ -74,7 +76,7 @@ app.use("/api/gantt", ganttRoutes);
 // spec's exact paths (GET /api/projects/:projectId/labour, POST
 // /api/projects/:projectId/delays) use the plural /api/projects prefix,
 // which is a NEW mount and does not collide with the existing one.
-app.use("/api/labour", labourManagementRoutes);
+
 app.use("/api/projects", projectLabourRoutes);
 app.use("/api/projects", projectDelayRoutes);
 app.use("/api/drawings", drawingRoutes);
@@ -84,6 +86,7 @@ app.use("/api/delays", delayRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/audit", auditRoutes);
 app.use("/api/reports", erpReportRoutes);
+app.use("/api/purchase-orders", purchaseOrderRoutes);
 
 
 

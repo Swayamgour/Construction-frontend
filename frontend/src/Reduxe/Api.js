@@ -30,8 +30,8 @@ export const Api = createApi({
     reducerPath: "erpApi",
 
     baseQuery: fetchBaseQuery({
-        baseUrl: "https://backendapi.ssconstructionsup.in/api/",
-        // baseUrl: "http://localhost:5002/api/",
+        // baseUrl: "https://backendapi.ssconstructionsup.in/api/",
+        baseUrl: "http://localhost:5002/api/",
 
         prepareHeaders: (headers) => {
             const token = localStorage.getItem("token");
@@ -52,6 +52,7 @@ export const Api = createApi({
         "DrawingRequest", "DrawingVersion",
         "MachineRequest", "MachineDocument", "OperatorLog",
         "EOD", "Delay", "DelayCategory", "Notification", "Audit", "Dashboard",
+        "PurchaseOrder",
     ],
 
     endpoints: (build) => ({
@@ -129,7 +130,7 @@ export const Api = createApi({
         }),
 
         getProjects: build.query({
-            query: () => "project",
+            query: (params) => ({ url: "project", params }),
             providesTags: ["Project"],
         }),
 
@@ -177,7 +178,7 @@ export const Api = createApi({
            VENDORS
            ===================================================================== */
         getVendors: build.query({
-            query: () => `vendor/all`,
+            query: (params) => ({ url: `vendor/all`, params }),
             providesTags: ["Vendor"],
         }),
 
@@ -311,6 +312,13 @@ export const Api = createApi({
         getProjectActiveLabour: build.query({
             query: ({ projectId, ...params }) => ({ url: `projects/${projectId}/labour`, params }),
             providesTags: ["LabourAssignment"],
+        }),
+
+        // ⭐ NEW: single aggregate endpoint — labour + assignments +
+        // transfers + attendance + overtime in one call.
+        getLabourFullHistory: build.query({
+            query: (labourId) => `labour/${labourId}/full-history`,
+            providesTags: ["LabourAssignment", "Labour"],
         }),
 
         /* NEW: LABOUR WORKING TIME / OVERTIME */
@@ -564,6 +572,23 @@ export const Api = createApi({
             providesTags: ["Ledger"],
         }),
 
+        // ⭐ NEW: Opening Stock / Damage / Adjustment — centralized inventory
+        // movements added on the backend that had no frontend wiring yet.
+        openingStock: build.mutation({
+            query: (body) => ({ url: "stock/opening", method: "POST", body }),
+            invalidatesTags: ["Inventory", "Ledger", "Stock"],
+        }),
+
+        damageInventory: build.mutation({
+            query: (body) => ({ url: "stock/damage", method: "POST", body }),
+            invalidatesTags: ["Inventory", "Ledger", "Stock"],
+        }),
+
+        adjustInventory: build.mutation({
+            query: (body) => ({ url: "stock/adjustment", method: "POST", body }),
+            invalidatesTags: ["Inventory", "Ledger", "Stock"],
+        }),
+
         /* =====================================================================
            NEW: DRAWINGS  (/api/drawings/*)
            ===================================================================== */
@@ -796,6 +821,36 @@ export const Api = createApi({
             providesTags: ["Maintenance"],
         }),
 
+        // ⭐ NEW: meter/hour-based maintenance due (derived from DailyUsage
+        // hoursRun since the machine's last service) — no frontend before.
+        getMeterBasedMaintenanceDue: build.query({
+            query: (bufferHours) => ({ url: "machinery/maintenance/meter-due", params: bufferHours ? { bufferHours } : {} }),
+            providesTags: ["Maintenance"],
+        }),
+
+        // ⭐ NEW: Operator assignment lifecycle (assign/change/remove +
+        // permanent history) — distinct from the daily working-hours log
+        // above (logMachineOperatorDay). Acts on a MachineAssignment id.
+        assignOperatorToMachine: build.mutation({
+            query: ({ assignmentId, ...body }) => ({ url: `machinery/assignments/${assignmentId}/operator`, method: "POST", body }),
+            invalidatesTags: ["Assignments", "OperatorLog"],
+        }),
+
+        changeOperator: build.mutation({
+            query: ({ assignmentId, ...body }) => ({ url: `machinery/assignments/${assignmentId}/operator/change`, method: "PATCH", body }),
+            invalidatesTags: ["Assignments", "OperatorLog"],
+        }),
+
+        removeOperator: build.mutation({
+            query: ({ assignmentId, ...body }) => ({ url: `machinery/assignments/${assignmentId}/operator/remove`, method: "PATCH", body }),
+            invalidatesTags: ["Assignments", "OperatorLog"],
+        }),
+
+        getOperatorAssignmentHistory: build.query({
+            query: (assignmentId) => `machinery/assignments/${assignmentId}/operator/history`,
+            providesTags: ["OperatorLog", "Assignments"],
+        }),
+
         /* =====================================================================
            NEW: EOD DAILY REPORT  (/api/eod/*)
            ===================================================================== */
@@ -890,6 +945,13 @@ export const Api = createApi({
            ===================================================================== */
         getModuleAuditHistory: build.query({
             query: ({ module, entityId }) => `audit/${module}/${entityId}`,
+            providesTags: ["Audit"],
+        }),
+
+        // ⭐ NEW: global paginated/filterable audit log (admin/manager
+        // oversight) — previously only the per-entity lookup above existed.
+        getAuditLogs: build.query({
+            query: (params) => ({ url: "audit", params }),
             providesTags: ["Audit"],
         }),
 
@@ -1167,6 +1229,57 @@ export const Api = createApi({
             query: (id) => ({ url: `assignWork/${id}`, method: "DELETE" }),
             invalidatesTags: ["AssignWork"],
         }),
+
+        /* =====================================================================
+           NEW: PURCHASE ORDERS  (/api/purchase-orders/*)
+           Backend workflow: DRAFT -> SUBMITTED -> APPROVED -> ORDERED ->
+           PARTIALLY_RECEIVED/RECEIVED -> CLOSED, or CANCELLED at most stages.
+           Added because the backend module existed with zero frontend wiring.
+           ===================================================================== */
+        createPurchaseOrder: build.mutation({
+            query: (body) => ({ url: "purchase-orders", method: "POST", body }),
+            invalidatesTags: ["PurchaseOrder"],
+        }),
+
+        getPurchaseOrders: build.query({
+            query: (params) => ({ url: "purchase-orders", params }),
+            providesTags: ["PurchaseOrder"],
+        }),
+
+        getPurchaseOrderById: build.query({
+            query: (id) => `purchase-orders/${id}`,
+            providesTags: (result, error, id) => [{ type: "PurchaseOrder", id }],
+        }),
+
+        updatePurchaseOrder: build.mutation({
+            query: ({ id, ...body }) => ({ url: `purchase-orders/${id}`, method: "PATCH", body }),
+            invalidatesTags: ["PurchaseOrder"],
+        }),
+
+        submitPurchaseOrder: build.mutation({
+            query: (id) => ({ url: `purchase-orders/${id}/submit`, method: "PATCH" }),
+            invalidatesTags: ["PurchaseOrder"],
+        }),
+
+        approvePurchaseOrder: build.mutation({
+            query: (id) => ({ url: `purchase-orders/${id}/approve`, method: "PATCH" }),
+            invalidatesTags: ["PurchaseOrder"],
+        }),
+
+        orderPurchaseOrder: build.mutation({
+            query: (id) => ({ url: `purchase-orders/${id}/order`, method: "PATCH" }),
+            invalidatesTags: ["PurchaseOrder"],
+        }),
+
+        cancelPurchaseOrder: build.mutation({
+            query: (id) => ({ url: `purchase-orders/${id}/cancel`, method: "PATCH" }),
+            invalidatesTags: ["PurchaseOrder"],
+        }),
+
+        closePurchaseOrder: build.mutation({
+            query: (id) => ({ url: `purchase-orders/${id}/close`, method: "PATCH" }),
+            invalidatesTags: ["PurchaseOrder"],
+        }),
     }),
 });
 
@@ -1222,6 +1335,7 @@ export const {
     useGetLabourAssignmentsQuery,
     useGetLabourAssignmentHistoryQuery,
     useGetProjectActiveLabourQuery,
+    useGetLabourFullHistoryQuery,
     useRecordLabourWorkingTimeMutation,
     useGetOvertimeRecordsQuery,
     useApproveOvertimeMutation,
@@ -1273,6 +1387,9 @@ export const {
     useGetStockReceiptsQuery,
     useGetInventoryQuery,
     useGetProjectLedgerQuery,
+    useOpeningStockMutation,
+    useDamageInventoryMutation,
+    useAdjustInventoryMutation,
 
     useCreateDrawingRequestMutation,
     useGetDrawingRequestsQuery,
@@ -1320,6 +1437,11 @@ export const {
     useGetFullMaintenanceHistoryQuery,
     useUpdateMaintenanceStatusMutation,
     useGetUpcomingMaintenanceQuery,
+    useGetMeterBasedMaintenanceDueQuery,
+    useAssignOperatorToMachineMutation,
+    useChangeOperatorMutation,
+    useRemoveOperatorMutation,
+    useGetOperatorAssignmentHistoryQuery,
 
     useSubmitEODMutation,
     useGetEODReportsQuery,
@@ -1341,6 +1463,7 @@ export const {
     useMarkAllNotificationsReadMutation,
 
     useGetModuleAuditHistoryQuery,
+    useGetAuditLogsQuery,
 
     useGetLabourOvertimeReportQuery,
     useGetStockReportQuery,
@@ -1399,6 +1522,16 @@ export const {
     useCreateAssignedWorkMutation,
     useUpdateAssignedWorkMutation,
     useDeleteAssignedWorkMutation,
+
+    useCreatePurchaseOrderMutation,
+    useGetPurchaseOrdersQuery,
+    useGetPurchaseOrderByIdQuery,
+    useUpdatePurchaseOrderMutation,
+    useSubmitPurchaseOrderMutation,
+    useApprovePurchaseOrderMutation,
+    useOrderPurchaseOrderMutation,
+    useCancelPurchaseOrderMutation,
+    useClosePurchaseOrderMutation,
 } = Api;
 
 export default Api;

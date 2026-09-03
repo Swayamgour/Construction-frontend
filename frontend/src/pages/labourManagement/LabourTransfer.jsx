@@ -1,6 +1,9 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { History, Users2 } from "lucide-react";
 import ReportTable from "../../components/ReportTable";
+import Modal from "../../components/Modal";
 import {
     useGetLabourQuery,
     useGetProjectsQuery,
@@ -8,6 +11,7 @@ import {
     useTransferLabourMutation,
     useReleaseLabourMutation,
     useGetLabourAssignmentsQuery,
+    useGetLabourAssignmentHistoryQuery,
 } from "../../Reduxe/Api";
 
 /**
@@ -34,6 +38,16 @@ const LabourTransfer = () => {
     const [form, setForm] = useState({ labourId: "", projectId: "", toProjectId: "", transferReason: "", remarks: "" });
 
     const isLoading = assigning || transferring || releasing;
+    const navigate = useNavigate();
+
+    // History modal — GET /api/labour/:id/history (getLabourAssignmentHistory).
+    // Was already wired in Api.js but had no screen anywhere.
+    const [historyLabourId, setHistoryLabourId] = useState(null);
+    const { data: historyResp, isFetching: loadingHistory } = useGetLabourAssignmentHistoryQuery(
+        historyLabourId,
+        { skip: !historyLabourId }
+    );
+    const history = historyResp?.data || [];
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -77,11 +91,30 @@ const LabourTransfer = () => {
         { header: "Assignment Date", render: (row) => new Date(row.assignmentDate).toLocaleDateString() },
         { header: "Transfer Reason", accessor: "transferReason" },
         { header: "Remarks", accessor: "remarks" },
+        {
+            header: "Action", render: (row) => (
+                <button
+                    onClick={() => setHistoryLabourId(row.labourId?._id)}
+                    disabled={!row.labourId?._id}
+                    className="px-2 py-1 border border-gray-300 text-gray-600 rounded text-xs flex items-center gap-1 hover:bg-gray-50 disabled:opacity-40"
+                >
+                    <History size={12} /> History
+                </button>
+            )
+        },
     ];
 
     return (
         <div className="p-6 max-w-6xl mx-auto space-y-6">
-            <h1 className="text-2xl font-bold text-gray-800">Labour Assignment & Transfer</h1>
+            <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-bold text-gray-800">Labour Assignment & Transfer</h1>
+                <button
+                    onClick={() => navigate("/labour/project-active")}
+                    className="flex items-center gap-1.5 text-sm border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50"
+                >
+                    <Users2 size={14} /> View Active Labour by Project
+                </button>
+            </div>
 
             <div className="bg-white rounded-xl shadow p-6">
                 <div className="flex gap-2 mb-4">
@@ -119,7 +152,7 @@ const LabourTransfer = () => {
                             required
                         >
                             <option value="">Select Project</option>
-                            {projects.map((p) => (
+                            {projects?.map((p) => (
                                 <option key={p._id} value={p._id}>{p.projectName}</option>
                             ))}
                         </select>
@@ -134,7 +167,7 @@ const LabourTransfer = () => {
                                 required
                             >
                                 <option value="">Transfer To Project</option>
-                                {projects.map((p) => (
+                                {projects?.map((p) => (
                                     <option key={p._id} value={p._id}>{p.projectName}</option>
                                 ))}
                             </select>
@@ -170,6 +203,40 @@ const LabourTransfer = () => {
                 <h2 className="text-lg font-semibold mb-3">Assignment History</h2>
                 <ReportTable columns={columns} data={assignments} />
             </div>
+
+            <Modal
+                open={!!historyLabourId}
+                title="Labour Assignment History"
+                onClose={() => setHistoryLabourId(null)}
+            >
+                {loadingHistory ? (
+                    <p className="text-sm text-gray-500 py-6 text-center">Loading...</p>
+                ) : history.length === 0 ? (
+                    <p className="text-sm text-gray-500 py-6 text-center">No assignment history found.</p>
+                ) : (
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {history.map((h) => (
+                            <div key={h._id} className="border border-gray-200 rounded-lg p-3 text-sm">
+                                <div className="flex justify-between items-center">
+                                    <span className="font-medium">{h.projectId?.projectName || "-"}</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                        h.status === "Active" ? "bg-green-100 text-green-700" :
+                                        h.status === "Transferred" ? "bg-blue-100 text-blue-700" :
+                                        "bg-gray-100 text-gray-700"
+                                    }`}>{h.status}</span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Since {new Date(h.assignmentDate).toLocaleDateString()}
+                                    {h.previousProjectId?.projectName ? ` · from ${h.previousProjectId.projectName}` : ""}
+                                    {h.releaseDate ? ` · ended ${new Date(h.releaseDate).toLocaleDateString()}` : ""}
+                                </p>
+                                {h.transferReason && <p className="text-xs text-gray-500">Reason: {h.transferReason}</p>}
+                                {h.assignedBy?.name && <p className="text-xs text-gray-400">By {h.assignedBy.name}</p>}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 };

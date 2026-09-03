@@ -98,7 +98,7 @@ const EODReports = () => {
                 <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <select className="border p-2 rounded-lg" value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })} required>
                         <option value="">Select Project</option>
-                        {projects.map((p) => <option key={p._id} value={p._id}>{p.projectName}</option>)}
+                        {projects?.map((p) => <option key={p._id} value={p._id}>{p.projectName}</option>)}
                     </select>
                     <input type="date" className="border p-2 rounded-lg" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
 

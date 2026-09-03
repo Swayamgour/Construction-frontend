@@ -1,5 +1,6 @@
 import MachineMaintenance from "../models/MachineMaintenance.js";
 import Machine from "../models/Machine.js";
+import DailyUsage from "../models/DailyUsage.js";
 import { uploadToCloudinary } from "../utils/cloudUpload.js";
 import { success, fail, getPagination, buildPagination, getDateRangeFilter } from "../utils/apiResponse.js";
 import { logAudit } from "../utils/audit.js";
@@ -50,7 +51,8 @@ export const reportMaintenance = async (req, res) => {
   try {
     const {
       projectId, maintenanceType, issue, description, reportedDate, serviceDate,
-      serviceProvider, cost, partsUsed, nextMaintenanceDate, machineMeterReading, status,
+      serviceProvider, cost, partsUsed, nextMaintenanceDate, machineMeterReading,
+      nextServiceMeterReading, status,
     } = req.body;
 
     const machineId = req.params.id;
@@ -87,6 +89,7 @@ export const reportMaintenance = async (req, res) => {
       nextMaintenanceDate: nextMaintenanceDate || null,
       nextServiceOn: nextMaintenanceDate || null,
       machineMeterReading: machineMeterReading ?? null,
+      nextServiceMeterReading: nextServiceMeterReading ?? null,
       status: status || "Reported",
       createdBy: req.user.id,
     });
@@ -140,6 +143,69 @@ export const getUpcomingMaintenance = async (req, res) => {
     return success(res, 200, "Upcoming maintenance fetched", upcoming);
   } catch (err) {
     return fail(res, 500, "Error fetching upcoming maintenance", err);
+  }
+};
+
+/**
+ * GET /api/machinery/maintenance/meter-due
+ * Meter/hour-based maintenance due detection — the piece the follow-up
+ * audit flagged as missing. Real "current meter hours" isn't stored
+ * anywhere as a live field, so it's derived: (meter reading at the
+ * machine's last completed service) + (sum of DailyUsage.hoursRun logged
+ * since that service date). A machine is flagged once its derived
+ * current reading is within `bufferHours` of, or past,
+ * nextServiceMeterReading.
+ */
+export const getMeterBasedMaintenanceDue = async (req, res) => {
+  try {
+    const bufferHours = Number(req.query.bufferHours) || 200;
+
+    // One most-recent record per machine that actually set a meter-based
+    // threshold — that's the baseline to project forward from.
+    const latestWithThreshold = await MachineMaintenance.aggregate([
+      { $match: { nextServiceMeterReading: { $ne: null } } },
+      { $sort: { serviceDate: -1 } },
+      {
+        $group: {
+          _id: "$machineId",
+          maintenanceId: { $first: "$_id" },
+          serviceDate: { $first: "$serviceDate" },
+          machineMeterReading: { $first: "$machineMeterReading" },
+          nextServiceMeterReading: { $first: "$nextServiceMeterReading" },
+        },
+      },
+    ]);
+
+    const due = [];
+    for (const rec of latestWithThreshold) {
+      const usageSince = await DailyUsage.aggregate([
+        { $match: { machineId: rec._id, date: { $gt: rec.serviceDate } } },
+        { $group: { _id: null, totalHours: { $sum: "$hoursRun" } } },
+      ]);
+      const hoursSinceService = usageSince[0]?.totalHours || 0;
+      const currentMeter = (rec.machineMeterReading || 0) + hoursSinceService;
+      const remaining = rec.nextServiceMeterReading - currentMeter;
+
+      if (remaining <= bufferHours) {
+        const machine = await Machine.findById(rec._id).select("machineNumber machineType");
+        due.push({
+          machineId: rec._id,
+          machine,
+          lastMaintenanceId: rec.maintenanceId,
+          lastServiceDate: rec.serviceDate,
+          meterAtLastService: rec.machineMeterReading || 0,
+          hoursRunSinceService: hoursSinceService,
+          estimatedCurrentMeter: currentMeter,
+          nextServiceMeterReading: rec.nextServiceMeterReading,
+          hoursRemaining: remaining,
+          status: remaining <= 0 ? "Overdue" : "Due Soon",
+        });
+      }
+    }
+
+    return success(res, 200, "Meter-based maintenance due fetched", due);
+  } catch (err) {
+    return fail(res, 500, "Error computing meter-based maintenance due", err);
   }
 };
 

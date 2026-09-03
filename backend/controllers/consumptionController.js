@@ -1,9 +1,10 @@
+import mongoose from "mongoose";
 import MaterialConsumption from "../models/MaterialConsumption.js";
-import Stock from "../models/Stock.js";
-// import Stock from "../models/Stock.js";
-import StockLedger from "../models/stockLedgerSchema.js";
+import { applyStockLedgerEntry } from "../utils/inventory.js";
+import { logAudit } from "../utils/audit.js";
 
 export const addConsumptionMultiple = async (req, res) => {
+    const session = await mongoose.startSession();
     try {
         const { projectId, items } = req.body;
 
@@ -13,61 +14,60 @@ export const addConsumptionMultiple = async (req, res) => {
 
         const userId = req.user.id;
 
-        // 🔥 Create consumption records
-        const saved = await MaterialConsumption.create(
-            items.map((i) => ({
-                projectId,
-                itemId: i.itemId,
-                qtyUsed: i.qtyUsed,
-                unit: i.unit || "",
-                remarks: i.remarks || "",
-                usedBy: userId,
-                usedAt: new Date(),
-            }))
-        );
-
-        // 🔥 NOW UPDATE STOCK + LEDGER
         for (const it of items) {
             const qty = Number(it.qtyUsed);
-
-            // 1️⃣ Update Stock
-            let stock = await Stock.findOne({ itemId: it.itemId });
-
-            if (stock) {
-                const idx = stock.projectBalances.findIndex(
-                    pb => String(pb.projectId) === String(projectId)
-                );
-
-                if (idx >= 0) {
-                    stock.projectBalances[idx].qty -= qty;
-                }
-
-                stock.quantity -= qty;
-                await stock.save();
+            if (!it.itemId || !Number.isFinite(qty) || qty <= 0) {
+                return res.status(400).json({ message: `Invalid item/qtyUsed in consumption payload: ${JSON.stringify(it)}` });
             }
-
-            // 2️⃣ Ledger (PROJECT-WISE)
-            const lastEntry = await StockLedger.findOne({
-                itemId: it.itemId,
-                projectId
-            }).sort({ createdAt: -1 });
-
-            const previousBalance = lastEntry ? lastEntry.balanceQty : 0;
-            const newBalance = previousBalance - qty;
-
-            await StockLedger.create({
-                itemId: it.itemId,
-                projectId,
-                transactionType: "CONSUMPTION",
-                referenceId: null,
-                referenceNumber: `CONS-${Date.now()}`,
-                qtyIn: 0,
-                qtyOut: qty,
-                balanceQty: newBalance,
-                remarks: it.remarks || "Material consumed"
-            });
         }
 
+        // ⭐ Consumption record creation + stock debit + ledger entry now all
+        // happen inside ONE transaction, through the centralized
+        // applyStockLedgerEntry choke-point (utils/inventory.js) instead of
+        // mutating Stock directly. This closes two real bugs the earlier
+        // version had: (1) it could push a project's balance negative —
+        // applyStockLedgerEntry rejects that — and (2) a failure partway
+        // through the items loop could leave some consumption records
+        // saved with no matching stock/ledger change; that's no longer
+        // possible since everything commits or rolls back together.
+        let saved;
+        await session.withTransaction(async () => {
+            saved = await MaterialConsumption.create(
+                items.map((i) => ({
+                    projectId,
+                    itemId: i.itemId,
+                    qtyUsed: i.qtyUsed,
+                    unit: i.unit || "",
+                    remarks: i.remarks || "",
+                    usedBy: userId,
+                    usedAt: new Date(),
+                })),
+                { session }
+            );
+
+            for (const it of items) {
+                const qty = Number(it.qtyUsed);
+                const { ledgerEntry } = await applyStockLedgerEntry({
+                    projectId,
+                    itemId: it.itemId,
+                    qtyChange: -qty,
+                    transactionType: "CONSUMPTION",
+                    referenceNumber: `CONS-${Date.now()}`,
+                    remarks: it.remarks || "Material consumed",
+                    session,
+                });
+                await logAudit({
+                    module: "Inventory",
+                    entityId: ledgerEntry._id,
+                    action: "consumption",
+                    performedBy: userId,
+                    remarks: it.remarks || "",
+                    meta: { projectId, itemId: it.itemId, qty },
+                    projectId,
+                    session,
+                });
+            }
+        });
 
         return res.status(201).json({
             message: "Consumption saved successfully",
@@ -75,10 +75,12 @@ export const addConsumptionMultiple = async (req, res) => {
         });
 
     } catch (err) {
-        return res.status(500).json({
+        return res.status(400).json({
             message: "Error saving consumption",
             error: err.message,
         });
+    } finally {
+        session.endSession();
     }
 };
 

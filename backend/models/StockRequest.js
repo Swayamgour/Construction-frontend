@@ -23,6 +23,7 @@ const stockRequestSchema = new mongoose.Schema(
         category: { type: String, default: "" },
 
         quantity: { type: Number, required: true, min: 0.01 },
+        fulfilledQty: { type: Number, default: 0, min: 0 },
         unit: { type: String, required: true },
 
         requiredDate: { type: Date, required: true },

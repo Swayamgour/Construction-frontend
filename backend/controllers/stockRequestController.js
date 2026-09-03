@@ -60,7 +60,11 @@ export const listStockRequests = async (req, res) => {
 
         const filter = {};
         if (req.user.role === "supervisor") filter.requestedBy = req.user.id;
-        if (projectId) filter.projectId = projectId;
+        if (req.user.role !== "admin" && Array.isArray(req.user.assignedProjects) && req.user.assignedProjects.length) filter.projectId = { $in: req.user.assignedProjects };
+        if (projectId) {
+            if (filter.projectId?.$in && !filter.projectId.$in.map(String).includes(String(projectId))) return fail(res, 403, "Access denied for this project");
+            filter.projectId = projectId;
+        }
         if (status) filter.status = status;
         if (priority) filter.priority = priority;
         if (materialId) filter.materialId = materialId;
@@ -108,27 +112,17 @@ export const getStockRequest = async (req, res) => {
  */
 export const reviewStockRequest = async (req, res) => {
     try {
-        const { decision, adminRemarks } = req.body; // decision: "reject" | "acknowledge"
+        const { decision, adminRemarks } = req.body; // reject | transfer | procurement
         const request = await StockRequest.findById(req.params.id);
         if (!request) return fail(res, 404, "Stock request not found");
-        if (request.status !== "PENDING_ADMIN_REVIEW") {
-            return fail(res, 400, `Request already ${request.status}`);
-        }
-
-        if (decision === "reject") {
-            request.status = "REJECTED";
-        }
-        request.adminRemarks = adminRemarks || "";
-        request.reviewedBy = req.user.id;
-        request.reviewedAt = new Date();
-        request.updatedBy = req.user.id;
+        if (request.status !== "PENDING_ADMIN_REVIEW") return fail(res, 400, `Request already ${request.status}`);
+        const map = { reject: "REJECTED", transfer: "APPROVED_TRANSFER", procurement: "APPROVED_PROCUREMENT" };
+        if (!map[decision]) return fail(res, 400, "decision must be reject, transfer or procurement");
+        request.status = map[decision];
+        request.adminRemarks = adminRemarks || ""; request.reviewedBy=req.user.id; request.reviewedAt=new Date(); request.updatedBy=req.user.id;
         await request.save();
-
-        await logAudit({ module: "StockRequest", entityId: request._id, action: decision === "reject" ? "rejected" : "reviewed", performedBy: req.user.id, remarks: adminRemarks });
-        await notifyUsers({ userIds: [request.requestedBy], title: `Stock request ${request.status}`, message: `Your request for ${request.materialName} was ${request.status.toLowerCase()}`, module: "Stock", referenceType: "StockRequest", referenceId: request._id, projectId: request.projectId });
-
-        return success(res, 200, "Stock request updated", request);
-    } catch (error) {
-        return fail(res, 500, "Error reviewing stock request", error);
-    }
+        await logAudit({ module:"StockRequest", entityId:request._id, action:`review:${decision}`, performedBy:req.user.id, remarks:adminRemarks });
+        await notifyUsers({ userIds:[request.requestedBy], title:`Stock request ${request.status}`, message:`Your request for ${request.materialName} was ${request.status.toLowerCase()}`, module:"Stock", referenceType:"StockRequest", referenceId:request._id, projectId:request.projectId });
+        return success(res,200,"Stock request reviewed",request);
+    } catch(error){ return fail(res,500,"Error reviewing stock request",error); }
 };

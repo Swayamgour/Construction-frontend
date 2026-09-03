@@ -18,6 +18,8 @@ const procurementSchema = new mongoose.Schema(
         tax: { type: Number, default: 0 }, // percent
         totalAmount: { type: Number, default: 0 },
 
+        purchaseOrderId: { type: mongoose.Schema.Types.ObjectId, ref: "PurchaseOrder", default: null, index: true },
+
         poReferenceNumber: { type: String },
 
         expectedDeliveryDate: { type: Date, default: null },

@@ -104,7 +104,7 @@ export const updateEODReport = async (req, res) => {
         const isOwner = String(report.submittedBy) === String(req.user.id);
         const isPrivileged = ["admin", "manager"].includes(req.user.role);
         if (!isOwner && !isPrivileged) return fail(res, 403, "Not authorized to edit this report");
-        if (report.status === "Approved" && !isPrivileged) return fail(res, 400, "Approved reports can only be edited by a manager/admin");
+        if (report.status === "Approved") return fail(res, 400, "Approved reports are locked and cannot be edited");
 
         const editableFields = ["weather", "workingShift", "siteStatus", "workItems", "labourDetails", "machineryDetails", "materialConsumption", "issues"];
         for (const field of editableFields) {
@@ -140,6 +140,7 @@ export const approveEODReport = async (req, res) => {
         );
         if (!report) return fail(res, 404, "EOD report not found");
         await logAudit({ module: "EODReport", entityId: report._id, action: "approved", performedBy: req.user.id });
+        await notifyRoles({ roles: ["admin", "manager", "supervisor"], projectId: report.projectId, title: "EOD report approved", message: `EOD for ${new Date(report.date).toDateString()} was approved`, module: "EOD", referenceType: "EODReport", referenceId: report._id });
         return success(res, 200, "EOD report approved", report);
     } catch (error) {
         return fail(res, 500, "Error approving EOD report", error);
@@ -150,6 +151,10 @@ export const approveEODReport = async (req, res) => {
 export const rejectEODReport = async (req, res) => {
     try {
         const { reason } = req.body;
+        if (!reason || !String(reason).trim()) return fail(res, 400, "Rejection reason is required");
+        const existing = await EODReport.findById(req.params.id);
+        if (!existing) return fail(res, 404, "EOD report not found");
+        if (existing.status === "Approved") return fail(res, 400, "Approved EOD cannot be rejected");
         const report = await EODReport.findByIdAndUpdate(
             req.params.id,
             { status: "Rejected", rejectionReason: reason || "", approvedBy: req.user.id, approvedAt: new Date() },
@@ -157,6 +162,7 @@ export const rejectEODReport = async (req, res) => {
         );
         if (!report) return fail(res, 404, "EOD report not found");
         await logAudit({ module: "EODReport", entityId: report._id, action: "rejected", performedBy: req.user.id, remarks: reason });
+        await notifyRoles({ roles: ["admin", "manager", "supervisor"], projectId: report.projectId, title: "EOD report rejected", message: reason, module: "EOD", referenceType: "EODReport", referenceId: report._id });
         return success(res, 200, "EOD report rejected", report);
     } catch (error) {
         return fail(res, 500, "Error rejecting EOD report", error);

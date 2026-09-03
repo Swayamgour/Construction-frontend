@@ -1,5 +1,6 @@
 import Project from "../models/Project.js";
 import upload from "../middleware/upload.js";
+import { success, fail, getPagination, buildPagination } from "../utils/apiResponse.js";
 
 
 // ----------------------------
@@ -50,14 +51,31 @@ export const getAllProjects = async (req, res) => {
             query.supervisors = userId; // supervisors ARRAY
         }
 
-        const projects = await Project.find(query)
-            .populate("managerId", "name email phone role")
-            .populate("projectIncharge", "name email phone role")
-            .populate("createdBy", "name email")
-            .populate("supervisors", "name email phone role")
-            .sort({ createdAt: -1 });     // 📌 Latest first
+        // ⭐ Added pagination/search (follow-up audit concern #12 — this
+        // list had none before). search matches project name/code. (No
+        // status filter — Project has no status field in this schema.)
+        const { page, limit, skip } = getPagination(req);
+        const { search } = req.query;
+        if (search) {
+            query.$or = [
+                { projectName: { $regex: search, $options: "i" } },
+                { projectCode: { $regex: search, $options: "i" } },
+            ];
+        }
 
-        res.status(200).json(projects);
+        const [projects, total] = await Promise.all([
+            Project.find(query)
+                .populate("managerId", "name email phone role")
+                .populate("projectIncharge", "name email phone role")
+                .populate("createdBy", "name email")
+                .populate("supervisors", "name email phone role")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            Project.countDocuments(query),
+        ]);
+
+        return success(res, 200, "Projects fetched", projects, buildPagination(page, limit, total));
     } catch (error) {
         res.status(500).json({
             message: "Error fetching projects",

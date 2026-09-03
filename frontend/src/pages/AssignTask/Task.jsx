@@ -3,6 +3,8 @@ import {
     useGetTasksQuery,
     useUpdateTaskStatusMutation,
     useDeleteTaskMutation,
+    useUpdateTaskPriorityMutation,
+    useUpdateTaskDependenciesMutation,
 } from "../../Reduxe/Api";
 import { 
     FiTrash2, 
@@ -15,16 +17,24 @@ import {
     FiFilter,
     FiSearch,
     FiClock,
-    FiAlertCircle
+    FiAlertCircle,
+    FiEdit3,
+    FiX,
+    FiLink
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 
 export default function Tasks() {
     const { data, isLoading, refetch } = useGetTasksQuery();
     const [updateStatus] = useUpdateTaskStatusMutation();
     const [deleteTask] = useDeleteTaskMutation();
+    const [updatePriority] = useUpdateTaskPriorityMutation();
+    const [updateDependencies] = useUpdateTaskDependenciesMutation();
     const [filter, setFilter] = useState("all");
     const [searchTerm, setSearchTerm] = useState("");
+    const [editingTask, setEditingTask] = useState(null); // { _id, priority, dependencies }
+    const [depsInput, setDepsInput] = useState(""); // comma-separated task IDs
     const navigate = useNavigate();
 
     const userRole = localStorage.getItem("role");
@@ -38,6 +48,33 @@ export default function Tasks() {
         if (window.confirm(`Are you sure you want to delete "${task.title}"?`)) {
             await deleteTask(task._id);
             refetch();
+        }
+    };
+
+    const openEdit = (task) => {
+        setEditingTask(task);
+        setDepsInput((task.dependencies || []).map((d) => d._id || d).join(", "));
+    };
+
+    const savePriority = async (priority) => {
+        try {
+            await updatePriority({ id: editingTask._id, priority }).unwrap();
+            toast.success("Priority updated");
+            refetch();
+        } catch (err) {
+            toast.error(err?.data?.message || "Failed to update priority");
+        }
+    };
+
+    const saveDependencies = async () => {
+        const dependencies = depsInput.split(",").map((s) => s.trim()).filter(Boolean);
+        try {
+            await updateDependencies({ id: editingTask._id, dependencies }).unwrap();
+            toast.success("Dependencies updated");
+            setEditingTask(null);
+            refetch();
+        } catch (err) {
+            toast.error(err?.data?.message || "Failed to update dependencies");
         }
     };
 
@@ -237,6 +274,16 @@ export default function Tasks() {
                                             </span>
                                         </div>
                                     )}
+
+                                    {task.dependencies?.length > 0 && (
+                                        <div className="flex items-start gap-2 text-sm text-gray-600">
+                                            <FiLink className="text-indigo-500 mt-0.5" />
+                                            <span className="font-medium">Depends on:</span>
+                                            <span className="text-gray-500">
+                                                {task.dependencies.map((d) => d.title).join(", ")}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Action Buttons */}
@@ -263,13 +310,22 @@ export default function Tasks() {
                                     </div>
 
                                     {(userRole === "admin" || userRole === "manager") && (
-                                        <button
-                                            onClick={() => handleDelete(task)}
-                                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                            title="Delete Task"
-                                        >
-                                            <FiTrash2 size={16} />
-                                        </button>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                onClick={() => openEdit(task)}
+                                                className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                                                title="Edit Priority / Dependencies"
+                                            >
+                                                <FiEdit3 size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(task)}
+                                                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                title="Delete Task"
+                                            >
+                                                <FiTrash2 size={16} />
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -302,6 +358,58 @@ export default function Tasks() {
                                 Assign New Task
                             </button>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Priority / Dependencies Edit Modal */}
+            {editingTask && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+                        <div className="flex justify-between items-center p-6 border-b border-gray-200">
+                            <h3 className="text-lg font-bold text-gray-900">Edit "{editingTask.title}"</h3>
+                            <button onClick={() => setEditingTask(null)} className="text-gray-400 hover:text-gray-700">
+                                <FiX size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            <div>
+                                <label className="text-sm font-medium text-gray-700 mb-2 block">Priority</label>
+                                <div className="flex gap-2">
+                                    {["Low", "Medium", "High"].map((p) => (
+                                        <button
+                                            key={p}
+                                            onClick={() => savePriority(p)}
+                                            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                                                editingTask.priority === p
+                                                    ? "bg-blue-900 text-white border-blue-900"
+                                                    : "border-gray-300 text-gray-600 hover:bg-gray-50"
+                                            }`}
+                                        >
+                                            {p}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                                    Dependencies (task IDs, comma-separated)
+                                </label>
+                                <input
+                                    value={depsInput}
+                                    onChange={(e) => setDepsInput(e.target.value)}
+                                    placeholder="e.g. 64f1a2..., 64f1b7..."
+                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                                />
+                                <p className="text-xs text-gray-400 mt-1">This task will only be startable once its dependencies are complete.</p>
+                                <button
+                                    onClick={saveDependencies}
+                                    className="mt-3 w-full bg-blue-900 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg"
+                                >
+                                    Save Dependencies
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
