@@ -106,49 +106,97 @@ export const loginUser = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        const user = await User.findOne({ email });
-        if (!user) return res.status(404).json({ message: "User Not Found" });
+        console.log("LOGIN REQUEST:", { email });
 
-        // 🚫 Block inactive users
+        if (!email || !password) {
+            return res.status(400).json({
+                message: "Email and password are required"
+            });
+        }
+
+        console.log("STEP 1: Finding user");
+
+        const user = await User.findOne({ email });
+
+        console.log("STEP 2: User found:", !!user);
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User Not Found"
+            });
+        }
+
+        console.log("STEP 3: User ID:", user._id);
+        console.log("STEP 4: Password exists:", !!user.password);
+        console.log("STEP 5: JWT_SECRET exists:", !!process.env.JWT_SECRET);
+
         if (user.status === false) {
             return res.status(403).json({
                 message: "Your account is inactive. Please contact admin."
             });
         }
 
-        const checkPass = await bcrypt.compare(password, user.password);
-        if (!checkPass) return res.status(401).json({ message: "Invalid Password" });
+        console.log("STEP 6: Comparing password");
 
-        // ⭐ Module 17 — Project-Level Authorization.
-        // The token now carries the user's accessible-project set (their
-        // single "home" projectId plus any assignedProjects), so
-        // middleware/projectAccess.js can check project access without an
-        // extra DB read on every request. Admins get an empty array here —
-        // checkProjectAccess() already lets admins through regardless.
+        const checkPass = await bcrypt.compare(
+            password,
+            user.password
+        );
+
+        console.log("STEP 7: Password matched:", checkPass);
+
+        if (!checkPass) {
+            return res.status(401).json({
+                message: "Invalid Password"
+            });
+        }
+
         const projectScope = [
             ...(user.projectId ? [String(user.projectId)] : []),
-            ...(Array.isArray(user.assignedProjects) ? user.assignedprojects?.data?.map(String) : []),
+            ...(Array.isArray(user.assignedProjects)
+                ? user.assignedProjects.map(String)
+                : []),
         ];
+
+        console.log("STEP 8: Project scope:", projectScope);
+
+        console.log("STEP 9: Creating JWT");
 
         const token = jwt.sign(
             {
                 id: user._id,
                 role: user.role,
-                projectId: user.projectId || null,
+                projectId: user.projectId
+                    ? String(user.projectId)
+                    : null,
                 assignedProjects: [...new Set(projectScope)],
             },
             process.env.JWT_SECRET,
-            { expiresIn: "7d" }
+            {
+                expiresIn: "7d"
+            }
         );
 
-        res.json({
+        console.log("STEP 10: JWT created");
+
+        return res.status(200).json({
             message: "Login Successful",
             token,
             user
         });
 
     } catch (error) {
-        res.status(500).json({ message: "Login Error", error });
+
+        console.error("========== LOGIN ERROR ==========");
+        console.error("ERROR:", error);
+        console.error("MESSAGE:", error?.message);
+        console.error("STACK:", error?.stack);
+        console.error("=================================");
+
+        return res.status(500).json({
+            message: "Login Error",
+            error: error?.message || "Unknown login error"
+        });
     }
 };
 

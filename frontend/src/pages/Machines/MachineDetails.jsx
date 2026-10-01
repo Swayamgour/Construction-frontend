@@ -273,6 +273,18 @@ export default function MachineDetails() {
                     </div>
                 </div>
 
+                <div className="bg-white rounded-xl shadow-sm border p-5 mb-5">
+                    <h2 className="text-lg font-semibold mb-3">Machine Images</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                      {(machine.photos?.length ? machine.photos : (machine.photo ? [{url: machine.photo}] : [])).map((img,i)=>(
+                        <div key={img.publicId||i} className="border rounded-xl overflow-hidden">
+                          <a href={img.url} target="_blank" rel="noreferrer"><img src={img.url} alt={`Machine ${i+1}`} className="w-full h-36 object-cover" /></a>
+                          <a href={img.url} download className="block text-center text-xs py-2 text-blue-600">Download</a>
+                        </div>
+                      ))}
+                    </div>
+                </div>
+
                 {/* Tabs */}
                 <div className="mb-8">
                     <div className="border-b border-gray-200">

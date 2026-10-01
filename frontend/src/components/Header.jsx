@@ -1,13 +1,15 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Menu, Bell, ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Menu, Bell, ChevronDown, PanelLeftClose, PanelLeftOpen, LogOut, UserCircle2 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   useGetMyNotificationsQuery,
   useMarkNotificationReadMutation,
   useMarkAllNotificationsReadMutation,
 } from "../Reduxe/Api";
+import { APP_TAGLINE } from "../config/brand";
+import { getInitials, getAvatarGradient } from "../helper/avatar";
 
 // Friendly titles for the top bar breadcrumb — falls back to a
 // prettified version of the path segment when a route isn't listed.
@@ -37,6 +39,16 @@ const PAGE_TITLES = {
 const prettify = (path) => {
   const seg = path.split("/").filter(Boolean).pop() || "Dashboard";
   return seg.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+};
+
+const timeAgo = (dateStr) => {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
 };
 
 const Header = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, role, user }) => {
@@ -79,7 +91,7 @@ const Header = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, role, us
   };
 
   return (
-    <header className="flex items-center justify-between w-full bg-white/90 backdrop-blur-md px-4 sm:px-6 py-3 border-b border-gray-200 sticky top-0 z-40">
+    <header className="flex items-center justify-between w-full bg-white/80 backdrop-blur-xl px-4 sm:px-6 py-3 border-b border-gray-200/80 sticky top-0 z-40">
       {/* Left: menu toggles + breadcrumb */}
       <div className="flex items-center gap-3 min-w-0">
         <button
@@ -99,7 +111,7 @@ const Header = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, role, us
 
         <div className="min-w-0">
           <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{pageTitle}</h1>
-          <p className="text-xs text-gray-400 hidden sm:block">Construction ERP</p>
+          <p className="text-xs text-gray-400 hidden sm:block">{APP_TAGLINE}</p>
         </div>
       </div>
 
@@ -111,9 +123,15 @@ const Header = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, role, us
             onClick={() => setOpenNotifications((v) => !v)}
             className="relative p-2.5 rounded-xl hover:bg-gray-100 transition-colors text-gray-500"
           >
-            <Bell size={19} />
+            <motion.span
+              animate={unreadCount > 0 ? { rotate: [0, -12, 12, -8, 8, 0] } : {}}
+              transition={{ duration: 0.6, repeat: unreadCount > 0 ? Infinity : 0, repeatDelay: 4 }}
+              className="block"
+            >
+              <Bell size={19} />
+            </motion.span>
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full">
+              <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full ring-2 ring-white">
                 {unreadCount > 9 ? "9+" : unreadCount}
               </span>
             )}
@@ -126,10 +144,12 @@ const Header = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, role, us
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -8, scale: 0.98 }}
                 transition={{ duration: 0.15 }}
-                className="absolute right-0 top-12 w-80 bg-white shadow-xl rounded-2xl border border-gray-100 overflow-hidden z-50"
+                className="absolute right-0 top-12 w-80 bg-white shadow-2xl shadow-black/10 rounded-2xl border border-gray-100 overflow-hidden z-50"
               >
                 <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50/70">
-                  <span className="font-semibold text-gray-800 text-sm">Notifications</span>
+                  <span className="font-semibold text-gray-800 text-sm">
+                    Notifications{unreadCount > 0 ? ` (${unreadCount})` : ""}
+                  </span>
                   {unreadCount > 0 && (
                     <button
                       onClick={() => markAllRead()}
@@ -147,13 +167,14 @@ const Header = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, role, us
                       <div
                         key={n._id}
                         onClick={() => !n.isRead && markRead(n._id)}
-                        className={`px-4 py-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors ${!n.isRead ? "bg-indigo-50/60" : ""}`}
+                        className={`relative px-4 py-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors ${!n.isRead ? "bg-indigo-50/60" : ""}`}
                       >
-                        <p className="font-medium text-gray-800">{n.title}</p>
-                        <p className="text-gray-500 text-xs mt-0.5 line-clamp-2">{n.message}</p>
-                        <p className="text-gray-400 text-[11px] mt-1">
-                          {new Date(n.createdAt).toLocaleString()}
-                        </p>
+                        {!n.isRead && (
+                          <span className="absolute left-1.5 top-4 w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                        )}
+                        <p className="font-medium text-gray-800 pl-2">{n.title}</p>
+                        <p className="text-gray-500 text-xs mt-0.5 line-clamp-2 pl-2">{n.message}</p>
+                        <p className="text-gray-400 text-[11px] mt-1 pl-2">{timeAgo(n.createdAt)}</p>
                       </div>
                     ))
                   )}
@@ -177,11 +198,19 @@ const Header = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, role, us
             onClick={() => setOpenProfile((v) => !v)}
             className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-gray-100 transition-colors"
           >
-            <img
-              src="/profile.png"
-              alt="User"
-              className="w-9 h-9 rounded-full border-2 border-white shadow-sm object-cover"
-            />
+            {user?.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user?.name || "User"}
+                className="w-9 h-9 rounded-full border-2 border-white shadow-sm object-cover"
+              />
+            ) : (
+              <div
+                className={`w-9 h-9 rounded-full bg-gradient-to-br ${getAvatarGradient(user?.name)} flex items-center justify-center text-white text-xs font-semibold border-2 border-white shadow-sm`}
+              >
+                {getInitials(user?.name)}
+              </div>
+            )}
             <div className="hidden sm:block text-left leading-tight">
               <p className="text-sm font-semibold text-gray-800">{user?.name || "User"}</p>
               <p className="text-xs text-gray-400 capitalize">{role || "role"}</p>
@@ -196,20 +225,24 @@ const Header = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, role, us
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -8, scale: 0.98 }}
                 transition={{ duration: 0.15 }}
-                className="absolute right-0 top-14 w-48 bg-white shadow-xl rounded-2xl border border-gray-100 overflow-hidden z-50"
+                className="absolute right-0 top-14 w-52 bg-white shadow-2xl shadow-black/10 rounded-2xl border border-gray-100 overflow-hidden z-50"
               >
+                <div className="px-4 py-3 border-b bg-gray-50/70">
+                  <p className="text-sm font-semibold text-gray-800 truncate">{user?.name || "User"}</p>
+                  {user?.email && <p className="text-xs text-gray-400 truncate">{user.email}</p>}
+                </div>
                 <ul className="text-gray-700 py-1">
                   <li
                     onClick={() => { setOpenProfile(false); navigate("/Profile"); }}
-                    className="px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
                   >
-                    My Profile
+                    <UserCircle2 size={16} className="text-gray-400" /> My Profile
                   </li>
                   <li
                     onClick={handleLogout}
-                    className="px-4 py-2.5 text-sm hover:bg-red-50 text-red-600 cursor-pointer transition-colors"
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-red-50 text-red-600 cursor-pointer transition-colors"
                   >
-                    Logout
+                    <LogOut size={16} /> Logout
                   </li>
                 </ul>
               </motion.div>

@@ -102,6 +102,7 @@ import MachineUsage from "./pages/Machines/MachineUsage";
 import ProjectAttendancePage from "./pages/Attendence/ProjectAttendancePage";
 import PendingAttendancePage from "./pages/Attendence/PendingAttendancePage";
 import AttendanceLabour from "./pages/AttendanceLabour";
+import AdminLabourAttendance from "./pages/attendance/AdminLabourAttendance";
 import Tasks from "./pages/AssignTask/Task";
 import MyTasks from "./pages/AssignTask/MyTasks";
 import ReportsDashboard from "./pages/reports/ReportsDashboard";
@@ -778,6 +779,8 @@ function App() {
             </Layout>
           }
         />
+
+        <Route path="/attendance/workforce" element={<Layout><AdminLabourAttendance /></Layout>} />
 
         <Route
           path="/AttendanceLabour"

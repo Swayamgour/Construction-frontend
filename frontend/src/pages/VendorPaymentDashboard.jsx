@@ -226,7 +226,7 @@ const VendorPaymentDashboard = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {projectsData.map((project) => (
+                                    {projectsData?.map((project) => (
                                         <React.Fragment key={project.id}>
                                             <tr className="border-b border-slate-100 hover:bg-blue-50/50 transition-colors duration-300">
                                                 <td className="py-4 px-6">

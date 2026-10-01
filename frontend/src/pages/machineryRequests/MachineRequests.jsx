@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { CheckRole } from "../../helper/CheckRole";
 import toast from "react-hot-toast";
 import ReportTable from "../../components/ReportTable";
 import {
@@ -33,6 +34,7 @@ const STATUS_COLORS = {
  * every movement stage — no frontend existed for it before.
  */
 const MachineRequests = () => {
+    const { role: userRole } = CheckRole();
     const [showCreate, setShowCreate] = useState(false);
     const [allocateModal, setAllocateModal] = useState(null);
 
@@ -135,9 +137,9 @@ const MachineRequests = () => {
         <div className="p-6 max-w-7xl mx-auto space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-gray-800">Machinery Requests</h1>
-                <button onClick={() => setShowCreate((v) => !v)} className="px-4 py-2 bg-blue-600 text-white rounded-lg">
+                {userRole !== "admin" && <button onClick={() => setShowCreate((v) => !v)} className="px-4 py-2 bg-blue-600 text-white rounded-lg">
                     {showCreate ? "Close" : "+ New Request"}
-                </button>
+                </button>}
             </div>
 
             {showCreate && (

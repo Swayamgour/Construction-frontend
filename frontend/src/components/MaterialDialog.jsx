@@ -45,6 +45,8 @@ function MaterialDialog({ isOpen, onClose, vendorId, data }) {
     });
 
     const [addItem] = useAddItemsMutation()
+    const [imageFiles, setImageFiles] = useState([]);
+    const [existingImages, setExistingImages] = useState(data?.images || []);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -61,17 +63,14 @@ function MaterialDialog({ isOpen, onClose, vendorId, data }) {
 
     async function onSubmit(formData) {
         try {
-            console.log("Submitted Data:", formData);
-
-            const response = await addItem(formData).unwrap();  // ⬅️ correct RTK query call
-
-            // If API responded successfully
+            const fd = new FormData();
+            Object.entries(formData).forEach(([key, value]) => {
+                if (value !== undefined && value !== null) fd.append(key, value);
+            });
+            imageFiles.forEach((file) => fd.append("images", file));
+            await addItem(fd).unwrap();
             toast.success(data ? "Product updated successfully" : "Product added successfully");
-
         } catch (error) {
-            console.log("Error:", error);
-
-            // Optional: show error toast
             toast.error(error?.data?.message || "Something went wrong");
         }
     }
@@ -229,7 +228,30 @@ function MaterialDialog({ isOpen, onClose, vendorId, data }) {
                     {data ? "Update" : "Save"}
                 </button>
 
-            </form>
+                            <div className="border border-dashed border-gray-300 rounded-xl p-4">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Product / Material Images</label>
+                    <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        multiple
+                        onChange={(e) => setImageFiles(Array.from(e.target.files || []))}
+                        className="w-full text-sm"
+                    />
+                    {(existingImages.length > 0 || imageFiles.length > 0) && (
+                        <div className="grid grid-cols-4 gap-2 mt-3">
+                            {existingImages.map((img, i) => (
+                                <a key={img.publicId || i} href={img.url} target="_blank" rel="noreferrer" className="block">
+                                    <img src={img.url} alt={img.name || `Image ${i+1}`} className="w-full h-20 object-cover rounded-lg border" />
+                                </a>
+                            ))}
+                            {imageFiles.map((file, i) => (
+                                <img key={i} src={URL.createObjectURL(file)} alt={file.name} className="w-full h-20 object-cover rounded-lg border" />
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+</form>
 
 
         </DialogBox>

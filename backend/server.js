@@ -1,13 +1,14 @@
 import dotenv from "dotenv";
-dotenv.config();   // ← MUST be first
+dotenv.config();
 
 import express from "express";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
+
 import connectDB from "./config/db.js";
 
-// routes import
-
-
+// Routes
 import authRoutes from "./routes/authRoutes.js";
 import projectRoutes from "./routes/projectRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
@@ -25,11 +26,8 @@ import consumptionRoutes from "./routes/consumptionRoutes.js";
 import stockRoutes from "./routes/stockRoutes.js";
 import assignmentRoutes from "./routes/assignmentRoutes.js";
 import ganttRoutes from "./routes/ganttRoutes.js";
-import cloudinary from "./config/cloudinary.js";
 
-// ⭐ NEW MODULES — Labour transfer/overtime, Stock Request/Transfer/Procurement,
-// Drawings, Machinery Request/Documents/Operator/Maintenance, EOD, Delay,
-// Notifications, Audit history, Reports (see FEATURE_ENHANCEMENT_SUMMARY.md)
+// New modules
 import labourManagementRoutes from "./routes/labourManagementRoutes.js";
 import projectLabourRoutes from "./routes/projectLabourRoutes.js";
 import drawingRoutes from "./routes/drawingRoutes.js";
@@ -42,64 +40,164 @@ import auditRoutes from "./routes/auditRoutes.js";
 import erpReportRoutes from "./routes/erpReportRoutes.js";
 import purchaseOrderRoutes from "./routes/purchaseOrderRoutes.js";
 
-
-
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
-connectDB();
-app.use(cors());
-app.use(express.json());
-app.use("/uploads", express.static("uploads"));
-app.use("/api/auth", authRoutes);
-app.use("/api/project", projectRoutes);
-app.use("/api/vendor", vendorRoutes);
-app.use("/api/item", itemRoutes);
-app.use("/api/assignLabour", labourRoutes);
-app.use("/api/mr", materialRequestRoutes);
-app.use("/api/attendance", attendanceRoutes);
-app.use("/api/labour", labourManagementRoutes);
-app.use("/api/machine/allocation", machineAllocationRoutes);
-app.use("/api/machine/usage", machineUsageRoutes);
-app.use("/api/task", taskRoutes);
-app.use("/api/stock", stockRoutes);
-app.use("/api/report", reportRoutes);
-app.use("/api/grn", grnRoutes);
-app.use("/api/consumption", consumptionRoutes);
-app.use("/api/machines", machineRoutes);
-app.use("/api/assignments", assignmentRoutes);
-app.use("/api/gantt", ganttRoutes);
-// app.use("/api/", consumptionRoutes);
+// ========================================
+// DATABASE
+// ========================================
 
-// ⭐ NEW MODULE MOUNTS
-// Note: existing project routes are mounted at singular /api/project; the
-// spec's exact paths (GET /api/projects/:projectId/labour, POST
-// /api/projects/:projectId/delays) use the plural /api/projects prefix,
-// which is a NEW mount and does not collide with the existing one.
+connectDB();
+
+// ========================================
+// GLOBAL MIDDLEWARE
+// ========================================
+
+app.use(
+    cors({
+        origin: "*",
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+    })
+);
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// ========================================
+// STATIC UPLOADS
+// ========================================
+
+// Backend:
+// C:\projets\erp\backend\uploads
+//
+// Browser URL:
+// http://localhost:5000/uploads/...
+
+const uploadsPath = path.join(__dirname, "uploads");
+
+console.log("📁 Uploads directory:", uploadsPath);
+
+app.use(
+    "/uploads",
+    express.static(uploadsPath, {
+        fallthrough: false,
+    })
+);
+
+// ========================================
+// API ROUTES
+// ========================================
+
+app.use("/api/auth", authRoutes);
+
+app.use("/api/project", projectRoutes);
+
+app.use("/api/vendor", vendorRoutes);
+
+app.use("/api/item", itemRoutes);
+
+app.use("/api/assignLabour", labourRoutes);
+
+app.use("/api/mr", materialRequestRoutes);
+
+app.use("/api/attendance", attendanceRoutes);
+
+app.use("/api/labour", labourManagementRoutes);
+
+app.use("/api/machine/allocation", machineAllocationRoutes);
+
+app.use("/api/machine/usage", machineUsageRoutes);
+
+app.use("/api/task", taskRoutes);
+
+app.use("/api/stock", stockRoutes);
+
+app.use("/api/report", reportRoutes);
+
+app.use("/api/grn", grnRoutes);
+
+app.use("/api/consumption", consumptionRoutes);
+
+app.use("/api/machines", machineRoutes);
+
+app.use("/api/assignments", assignmentRoutes);
+
+app.use("/api/gantt", ganttRoutes);
+
+// ========================================
+// NEW MODULE ROUTES
+// ========================================
 
 app.use("/api/projects", projectLabourRoutes);
+
 app.use("/api/projects", projectDelayRoutes);
+
 app.use("/api/drawings", drawingRoutes);
+
 app.use("/api/machinery", machineManagementRoutes);
+
 app.use("/api/eod", eodRoutes);
+
 app.use("/api/delays", delayRoutes);
+
 app.use("/api/notifications", notificationRoutes);
+
 app.use("/api/audit", auditRoutes);
+
 app.use("/api/reports", erpReportRoutes);
+
 app.use("/api/purchase-orders", purchaseOrderRoutes);
 
+// ========================================
+// API HEALTH CHECK
+// ========================================
 
-
-// Alternatively, you can send JSON
 app.get("/api", (req, res) => {
-
     res.json({
+        success: true,
         message: "Welcome to Construction Management API",
-        version: "1.0.0"
+        version: "1.0.0",
     });
 });
 
+// ========================================
+// 404 API HANDLER
+// ========================================
+
+// app.use("/api/*", (req, res) => {
+//     res.status(404).json({
+//         success: false,
+//         message: "API endpoint not found",
+//         path: req.originalUrl,
+//     });
+// });
+
+// ========================================
+// ERROR HANDLER
+// ========================================
+
+app.use((err, req, res, next) => {
+    console.error("❌ SERVER ERROR:", err);
+
+    res.status(err.status || 500).json({
+        success: false,
+        message: err.message || "Internal Server Error",
+    });
+});
+
+// ========================================
+// START SERVER
+// ========================================
+
 const PORT = process.env.PORT || 5000;
 
-
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+    console.log("========================================");
+    console.log("🚀 Construction ERP Backend Started");
+    console.log(`🌐 Server: http://localhost:${PORT}`);
+    console.log(`📁 Uploads: http://localhost:${PORT}/uploads`);
+    console.log("========================================");
+});

@@ -406,7 +406,7 @@ const AddNewLabour = () => {
                         {/* Progress line */}
                         <div className="absolute top-6 left-0 right-0 h-1 bg-slate-200 -z-10">
                             <div
-                                className="h-1 bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-500"
+                                className="h-1 bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-500"
                                 style={{ width: `${((currentStep - 1) / 4) * 100}%` }}
                             />
                         </div>
@@ -415,9 +415,9 @@ const AddNewLabour = () => {
                             <div key={step} className="flex flex-col items-center relative z-10">
                                 <div
                                     className={`w-14 h-14 rounded-2xl flex items-center justify-center border-2 font-semibold transition-all duration-300 transform hover:scale-110 ${step === currentStep
-                                        ? " text-white border-blue-600 shadow-lg shadow-blue-500/25"
+                                        ? "bg-gradient-to-br from-indigo-600 to-blue-600 text-white border-indigo-600 shadow-lg shadow-indigo-500/25"
                                         : step < currentStep
-                                            ? "bg-green-500 text-white border-green-500 shadow-lg shadow-green-500/25"
+                                            ? "bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/25"
                                             : "bg-white text-slate-400 border-slate-300"
                                         }`}
                                 >
@@ -1118,7 +1118,7 @@ const AddNewLabour = () => {
                                 <button
                                     type="button"
                                     onClick={nextStep}
-                                    className="px-3 md:px-8 py-3 md:py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transform hover:translate-x-1 transition-all flex items-center gap-2"
+                                    className="px-3 md:px-8 py-3 md:py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl font-semibold hover:from-indigo-700 hover:to-blue-700 shadow-sm hover:shadow-md transform hover:translate-x-1 transition-all flex items-center gap-2"
                                 >
                                     Next Step <ArrowRight className="w-4 h-4" />
                                 </button>
@@ -1126,7 +1126,7 @@ const AddNewLabour = () => {
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="px-6 md:px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl font-semibold hover:from-green-700 hover:to-green-800 shadow-sm hover:shadow-md transform hover:scale-105 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-6 md:px-8 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-xl font-semibold hover:from-emerald-700 hover:to-emerald-800 shadow-sm hover:shadow-md transform hover:scale-105 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isSubmitting ? (
                                         <>

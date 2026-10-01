@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
     FiArrowLeft,
     FiSave,
@@ -10,31 +10,98 @@ import {
     FiCheckCircle,
     FiEdit,
     FiNavigation,
+    FiFileText,
 } from "react-icons/fi";
 import { FaFileContract, FaUserTie } from "react-icons/fa";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { State, City } from "country-state-city";
 import toast from "react-hot-toast";
-import { useAddProjectMutation, useGetRolesQuery, useGetUsersQuery, useUpdateProjectMutation } from "../Reduxe/Api";
+import {
+    useAddProjectMutation,
+    useGetRolesQuery,
+    useUpdateProjectMutation,
+} from "../Reduxe/Api";
+import {
+    getFileUrl,
+    getFileName,
+    isImageFile,
+    toFileArray,
+} from "../utils/fileUrl";
+
+const FILE_FIELDS = [
+    "workOrderFile",
+    "siteLayoutFile",
+    "drawingsFile",
+    "clientKycFile",
+    "projectPhotosFile",
+    "notesFile",
+];
+
+// Helper function to format dates for input fields
+const formatDateForInput = (dateString) => {
+    if (!dateString) return "";
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date)) return "";
+        return date.toISOString().split("T")[0];
+    } catch (error) {
+        console.error("Error formatting date:", error);
+        return "";
+    }
+};
 
 const AddNewProject = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const id = location?.state?.projectId?._id;
 
-    const { data } = useGetRolesQuery()
-
-    // console.log(data)
-
-    const isEditMode = Boolean(id);
     const existingProject = location?.state?.projectId;
+    const id = existingProject?._id;
+    const isEditMode = Boolean(id);
+
+    const { data } = useGetRolesQuery();
+
+    // ============================================================
+    // Role-based Project Team Users (only ACTIVE users)
+    // ============================================================
+    const users = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data?.users)
+                ? data.users
+                : [];
+
+    const activeUsers = users.filter((user) => user?.status === true);
+
+    const supervisors = activeUsers.filter(
+        (user) => user?.role?.toLowerCase() === "supervisor"
+    );
+    const managers = activeUsers.filter(
+        (user) => user?.role?.toLowerCase() === "manager"
+    );
+    const consultants = activeUsers.filter((user) =>
+        ["consultant", "architect"].includes(user?.role?.toLowerCase())
+    );
+    const vendors = activeUsers.filter((user) =>
+        ["vendor", "subcontractor"].includes(user?.role?.toLowerCase())
+    );
+
+    const userOptions = (userList) =>
+        userList.map((user) => ({
+            label: `${user.name} (${user.role || "User"})`,
+            value: user._id,
+        }));
+
+    // ID -> name (for Review step)
+    const nameOf = (userId) =>
+        userId ? users.find((u) => u._id === userId)?.name || userId : "";
+
     const [addProject] = useAddProjectMutation();
     const [updateProject] = useUpdateProjectMutation();
-    const apiProject = location?.state?.projectId;
 
     const [formData, setFormData] = useState({
-        // ✅ 1. General Project Details
+        // 1. General Project Details
         projectName: "",
         clientName: "",
         projectCode: "",
@@ -42,7 +109,7 @@ const AddNewProject = () => {
         workScope: "",
         contractType: "",
 
-        // ✅ 2. Site Information
+        // 2. Site Information
         siteLocation: "",
         currentLocation: "",
         city: "",
@@ -53,11 +120,9 @@ const AddNewProject = () => {
         landmark: "",
         latitude: "",
         longitude: "",
+        locationMapLink: "",
 
-
-
-
-        // ✅ 3. Client / Authorized Person
+        // 3. Client / Authorized Person
         companyName: "",
         gst: "",
         ownerName: "",
@@ -67,7 +132,7 @@ const AddNewProject = () => {
         email: "",
         alternateContact: "",
 
-        // ✅ 4. Project Timeline
+        // 4. Project Timeline
         workOrderDate: "",
         expectedStartDate: "",
         actualStartDate: "",
@@ -75,22 +140,26 @@ const AddNewProject = () => {
         actualCompletionDate: "",
         projectDuration: "",
 
-        // ✅ 5. Internal Details
+        // 5. Internal Details
         projectIncharge: "",
-        projectManager: "",
-        managerId: '',
+        managerId: "",
         consultantArchitect: "",
         structuralConsultant: "",
         subcontractorVendor: "",
-        supervisorName: "",
 
-        // ✅ 6. Attachments (PDF checklists)
-        workOrderFile: null,
-        siteLayoutFile: null,
-        drawingsFile: null,
-        clientKycFile: null,
-        projectPhotosFile: null,
-        notesFile: null,
+        // 6. Attachments - newly selected File objects (multiple per field)
+        workOrderFile: [],
+        siteLayoutFile: [],
+        drawingsFile: [],
+        clientKycFile: [],
+        projectPhotosFile: [],
+        notesFile: [],
+
+        // Already uploaded files (edit mode, read-only, never sent back)
+        files: {},
+
+        labours: [],
+        supervisors: [],
     });
 
     const [errors, setErrors] = useState({});
@@ -100,47 +169,46 @@ const AddNewProject = () => {
     const [isGettingLocation, setIsGettingLocation] = useState(false);
     const [locationError, setLocationError] = useState("");
 
-    // ✅ Populate form with existing data when in edit mode
+    // Populate form with existing data when in edit mode
     useEffect(() => {
-        if (isEditMode) {
-            const projectData = existingProject || apiProject;
-            if (projectData) {
-                console.log("Populating form with project data:", projectData);
-                setFormData(prev => ({
-                    ...prev,
-                    ...projectData,
-                    projectIncharge: projectData?.projectIncharge?._id || "",
-                    managerId: projectData?.managerId?._id || "",
-                    consultantArchitect: projectData?.consultantArchitect?._id || projectData?.consultantArchitect || "",
-                    structuralConsultant: projectData?.structuralConsultant?._id || projectData?.structuralConsultant || "",
-                    // supervisors: projectData?.supervisor?._id || projectData?.supervisor || "",
-                    supervisors: projectData?.supervisors ? projectData.supervisors.map(s => s._id) : [],
+        if (!isEditMode || !existingProject) return;
 
-                    subcontractorVendor: projectData?.subcontractorVendor?._id || projectData?.subcontractorVendor || "",
-                    workOrderDate: formatDateForInput(projectData.workOrderDate),
-                    expectedStartDate: formatDateForInput(projectData.expectedStartDate),
-                    actualStartDate: formatDateForInput(projectData.actualStartDate),
-                    expectedCompletionDate: formatDateForInput(projectData.expectedCompletionDate),
-                    actualCompletionDate: formatDateForInput(projectData.actualCompletionDate),
-                }));
+        const p = existingProject;
 
-            }
-        }
-    }, [isEditMode, existingProject, apiProject]);
+        setFormData((prev) => ({
+            ...prev,
+            ...p,
+            latitude: p.latitude ?? "",
+            longitude: p.longitude ?? "",
+            projectIncharge: p.projectIncharge?._id || p.projectIncharge || "",
+            managerId: p.managerId?._id || p.managerId || "",
+            consultantArchitect: p.consultantArchitect?._id || p.consultantArchitect || "",
+            structuralConsultant: p.structuralConsultant?._id || p.structuralConsultant || "",
+            subcontractorVendor: p.subcontractorVendor?._id || p.subcontractorVendor || "",
+            supervisors: Array.isArray(p.supervisors)
+                ? p.supervisors.map((s) => (typeof s === "object" ? s._id : s))
+                : [],
+            labours: Array.isArray(p.labours)
+                ? p.labours.map((l) => (typeof l === "object" ? l._id : l))
+                : [],
+            workOrderDate: formatDateForInput(p.workOrderDate),
+            expectedStartDate: formatDateForInput(p.expectedStartDate),
+            actualStartDate: formatDateForInput(p.actualStartDate),
+            expectedCompletionDate: formatDateForInput(p.expectedCompletionDate),
+            actualCompletionDate: formatDateForInput(p.actualCompletionDate),
 
-    // Helper function to format dates for input fields
-    const formatDateForInput = (dateString) => {
-        if (!dateString) return "";
-        try {
-            const date = new Date(dateString);
-            return date.toISOString().split('T')[0];
-        } catch (error) {
-            console.error("Error formatting date:", error);
-            return "";
-        }
-    };
+            // keep new-file inputs empty; existing files live in `files`
+            workOrderFile: [],
+            siteLayoutFile: [],
+            drawingsFile: [],
+            clientKycFile: [],
+            projectPhotosFile: [],
+            notesFile: [],
+            files: p.files || {},
+        }));
+    }, [isEditMode, existingProject]);
 
-    // ✅ Get Current Location Function
+    // Get Current Location
     const getCurrentLocation = () => {
         if (!navigator.geolocation) {
             setLocationError("Geolocation is not supported by this browser.");
@@ -152,59 +220,49 @@ const AddNewProject = () => {
 
         navigator.geolocation.getCurrentPosition(
             async (position) => {
-                try {
-                    const { latitude, longitude } = position.coords;
+                const { latitude, longitude } = position.coords;
 
-                    // Reverse geocoding to get address
+                try {
                     const response = await fetch(
                         `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
                     );
-                    // console.log(response)
 
                     if (!response.ok) {
-                        throw new Error('Failed to fetch location data');
+                        throw new Error("Failed to fetch location data");
                     }
 
-                    const data = await response.json();
+                    const geo = await response.json();
 
                     const matchedState = State.getStatesOfCountry("IN").find(
-                        s => s.name.toLowerCase() === data.principalSubdivision?.toLowerCase()
+                        (s) =>
+                            s.name.toLowerCase() ===
+                            geo.principalSubdivision?.toLowerCase()
                     );
 
-                    setFormData(prev => ({
+                    setFormData((prev) => ({
                         ...prev,
-                        currentLocation: data.locality || data.city || matchedState?.name || "Unknown location",
-                        city: data.locality || data.city || "",
+                        currentLocation:
+                            geo.locality || geo.city || matchedState?.name || "Unknown location",
+                        city: geo.locality || geo.city || "",
                         state: matchedState?.isoCode || "",
-                        pinCode: data.postcode || "",
-                        locationMapLink: `https://www.google.com/maps?q=${latitude},${longitude}`,  // ⭐ NEW FIELD
-                        // latitude: latitude.toFixed(6),
-                        // longitude: longitude.toFixed(6),
-
+                        pinCode: geo.postcode || "",
                         latitude: Number(latitude.toFixed(6)),
                         longitude: Number(longitude.toFixed(6)),
-                        locationMapLink: `https://www.google.com/maps?q=${latitude},${longitude}`
+                        locationMapLink: `https://www.google.com/maps?q=${latitude},${longitude}`,
                     }));
 
-
-                    console.log(formData, data)
-
-
-
-
-
-
                     toast.success("Current location detected successfully!");
-
                 } catch (error) {
                     console.error("Error getting location:", error);
                     setLocationError("Failed to get detailed location information.");
 
-                    // Fallback: Just show coordinates
-                    const { latitude, longitude } = position.coords;
-                    setFormData(prev => ({
+                    // Fallback: coordinates only
+                    setFormData((prev) => ({
                         ...prev,
-                        currentLocation: `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`
+                        currentLocation: `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`,
+                        latitude: Number(latitude.toFixed(6)),
+                        longitude: Number(longitude.toFixed(6)),
+                        locationMapLink: `https://www.google.com/maps?q=${latitude},${longitude}`,
                     }));
                 } finally {
                     setIsGettingLocation(false);
@@ -230,47 +288,27 @@ const AddNewProject = () => {
             {
                 enableHighAccuracy: true,
                 timeout: 10000,
-                maximumAge: 60000
+                maximumAge: 60000,
             }
         );
     };
 
-    // console.log(formData)
-
-    // // ✅ Auto-detect location when component mounts (optional)
-    // useEffect(() => {
-    //     // Uncomment the line below if you want to auto-detect location on component mount
-    //     // getCurrentLocation();
-    // }, []);
-
-    // ✅ Validation rules for each step
+    // Validation rules for each step
     const validationRules = {
         1: {
             projectName: { required: true, message: "Project name is required" },
             clientName: { required: true, message: "Client name is required" },
-            projectCode: { required: false, message: "Project code is required" },
             projectType: { required: true, message: "Project type is required" },
             workScope: { required: true, message: "Work scope is required" },
             contractType: { required: true, message: "Contract type is required" },
         },
         2: {
             workOrderDate: { required: true, message: "Work order date is required" },
-            expectedStartDate: {
-                required: true,
-                message: "Expected start date is required",
-            },
-            expectedCompletionDate: {
-                required: true,
-                message: "Expected completion date is required",
-            },
-            projectDuration: {
-                // pattern: /^\d+$/,
-                message: "Project duration must be a number",
-            },
+            expectedStartDate: { required: true, message: "Expected start date is required" },
+            expectedCompletionDate: { required: true, message: "Expected completion date is required" },
         },
         3: {
             siteLocation: { required: true, message: "Site location is required" },
-            currentLocation: { required: false, message: "Current location is required" },
             city: { required: true, message: "City is required" },
             state: { required: true, message: "State is required" },
             pinCode: {
@@ -307,15 +345,12 @@ const AddNewProject = () => {
             },
         },
         4: {
-            projectIncharge: {
-                required: true,
-                message: "Project in-charge is required",
-            },
+            projectIncharge: { required: true, message: "Project in-charge is required" },
             managerId: { required: true, message: "Project manager is required" },
         },
     };
 
-    // ✅ Step titles and icons
+    // Step titles and icons
     const stepConfig = {
         1: { title: "General Details", icon: <FiClipboard className="text-blue-600" /> },
         2: { title: "Timeline", icon: <FiCheck className="text-green-600" /> },
@@ -324,34 +359,54 @@ const AddNewProject = () => {
         5: { title: "Review", icon: <FiSave className="text-indigo-600" /> },
     };
 
-    // ✅ Instant validation on typing
-    // ✅ Instant validation on typing
+    // Run one rule against a value -> error message or ""
+    const runRule = (rule, value) => {
+        if (rule.required && !value) return rule.message;
+        if (rule.pattern && value && !rule.pattern.test(value)) return rule.message;
+        return "";
+    };
+
+    // Completion date must not be before start date
+    const getDateOrderError = (data) => {
+        if (!data.expectedStartDate || !data.expectedCompletionDate) return "";
+        return new Date(data.expectedCompletionDate) < new Date(data.expectedStartDate)
+            ? "Completion date must be after start date"
+            : "";
+    };
+
+    // Instant validation on typing
     const handleInputChange = (e) => {
         const { name, type, value, files } = e.target;
-        let processedValue = value;
 
-        // 🔴 FIRST: Handle supervisors separately (array)
-        if (name === "supervisors") {
-            setFormData(prev => ({
-                ...prev,
-                supervisors: [value]   // ⭐ store as array
-            }));
-            setTouched((prev) => ({ ...prev, supervisors: true }));
-            validateField("supervisors", value);
-            return; // ⛔ stop further execution
+        // Multiple file handling
+        if (type === "file" || Array.isArray(files)) {
+            const selectedFiles = Array.isArray(files)
+                ? files.filter(Boolean)
+                : Array.from(files || []).filter(Boolean);
+
+            setFormData((prev) => ({ ...prev, [name]: selectedFiles }));
+            setTouched((prev) => ({ ...prev, [name]: true }));
+            return;
         }
 
-        // 🟢 Normal inputs below
+        // Supervisor select - backend expects an array
+        if (name === "supervisors") {
+            setFormData((prev) => ({
+                ...prev,
+                supervisors: value ? [value] : [],
+            }));
+            setTouched((prev) => ({ ...prev, supervisors: true }));
+            return;
+        }
+
+        let processedValue = value;
+
         if (type === "text" || type === "email") {
             if (name === "contactNumber" || name === "alternateContact") {
                 processedValue = value.replace(/\D/g, "").slice(0, 10);
             } else if (name === "pinCode") {
                 processedValue = value.replace(/\D/g, "").slice(0, 6);
-            } else if (
-                name === "siteArea" ||
-                name === "builtUpArea" ||
-                name === "projectDuration"
-            ) {
+            } else if (name === "siteArea" || name === "builtUpArea") {
                 processedValue = value.replace(/[^\d.]/g, "");
                 const dots = (processedValue.match(/\./g) || []).length;
                 if (dots > 1) processedValue = processedValue.slice(0, -1);
@@ -363,13 +418,16 @@ const AddNewProject = () => {
             }
         }
 
-        // 🔥 Auto duration (your existing code remains same)
         setFormData((prev) => {
-            const updated = {
-                ...prev,
-                [name]: type === "file" ? files[0] : processedValue,
-            };
+            const updated = { ...prev, [name]: processedValue };
 
+            // State change resets dependent fields
+            if (name === "state") {
+                updated.city = "";
+                updated.pinCode = "";
+            }
+
+            // Auto duration
             if (name === "expectedStartDate" || name === "expectedCompletionDate") {
                 const start = new Date(updated.expectedStartDate);
                 const end = new Date(updated.expectedCompletionDate);
@@ -383,35 +441,48 @@ const AddNewProject = () => {
                         months--;
                     }
 
-                    let tempDate = new Date(start);
+                    const tempDate = new Date(start);
                     tempDate.setMonth(tempDate.getMonth() + months);
-                    let diffTime = end - tempDate;
-                    let days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                    const days = Math.ceil((end - tempDate) / (1000 * 60 * 60 * 24));
 
                     if (months < 0 || days < 0) {
                         updated.projectDuration = "";
                     } else {
-                        updated.projectDuration = `${months} Month${months > 1 ? "s" : ""}${days ? ` ${days} Day${days > 1 ? "s" : ""}` : ""}`;
+                        updated.projectDuration =
+                            `${months} Month${months !== 1 ? "s" : ""}` +
+                            `${days ? ` ${days} Day${days > 1 ? "s" : ""}` : ""}`;
                     }
                 }
+
+                // Live date-order check
+                setErrors((p) => ({
+                    ...p,
+                    expectedCompletionDate:
+                        getDateOrderError(updated) ||
+                        runRule(
+                            validationRules[2].expectedCompletionDate,
+                            updated.expectedCompletionDate
+                        ),
+                }));
             }
+
             return updated;
         });
 
-        validateField(name, type === "file" ? files[0] : processedValue);
+        if (name !== "expectedStartDate" && name !== "expectedCompletionDate") {
+            validateField(name, processedValue);
+        }
         setTouched((prev) => ({ ...prev, [name]: true }));
     };
 
-
-
-    // ✅ Handle field blur
     const handleInputBlur = (e) => {
         const { name, value } = e.target;
         setTouched((prev) => ({ ...prev, [name]: true }));
         validateField(name, value);
     };
 
-    // ✅ Validate single field
+    // Validate single field
     const validateField = (fieldName, value) => {
         const stepWithField = Object.keys(validationRules).find(
             (s) => validationRules[s][fieldName]
@@ -419,43 +490,35 @@ const AddNewProject = () => {
 
         if (!stepWithField) return;
 
-        const rule = validationRules[stepWithField][fieldName];
-        let error = "";
-
-        if (rule.required && !value) {
-            error = rule.message;
-        } else if (rule.pattern && value && !rule.pattern.test(value)) {
-            error = rule.message;
-        }
-
+        const error = runRule(validationRules[stepWithField][fieldName], value);
         setErrors((prev) => ({ ...prev, [fieldName]: error }));
     };
 
-    // ✅ Validate current step (used while navigating)
+    // Validate current step (used while navigating)
     const validateStep = (step) => {
         const stepRules = validationRules[step];
         const newErrors = {};
+
         if (stepRules) {
             Object.keys(stepRules).forEach((field) => {
-                const rule = stepRules[field];
-                const value = formData[field];
-                if (rule.required && !value) {
-                    newErrors[field] = rule.message;
-                } else if (rule.pattern && value && !rule.pattern.test(value)) {
-                    newErrors[field] = rule.message;
-                }
+                const error = runRule(stepRules[field], formData[field]);
+                if (error) newErrors[field] = error;
             });
-        }
-        if (stepRules) {
+
             const stepTouched = {};
             Object.keys(stepRules).forEach((f) => (stepTouched[f] = true));
             setTouched((prev) => ({ ...prev, ...stepTouched }));
         }
+
+        if (step === 2 && !newErrors.expectedCompletionDate) {
+            const dateError = getDateOrderError(formData);
+            if (dateError) newErrors.expectedCompletionDate = dateError;
+        }
+
         setErrors((prev) => ({ ...prev, ...newErrors }));
         return Object.keys(newErrors).length === 0;
     };
 
-    // ✅ Navigation with validation
     const nextStep = () => {
         if (validateStep(currentStep)) {
             setCurrentStep((prev) => Math.min(prev + 1, 5));
@@ -468,9 +531,64 @@ const AddNewProject = () => {
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
-    // ✅ On Submit with final check
+    // Build multipart/form-data. Every new file is appended under its field name.
+    const buildProjectFormData = () => {
+        const payload = new FormData();
+
+        // Never sent to the backend
+        const ignoredFields = [
+            "_id",
+            "createdBy",
+            "createdAt",
+            "updatedAt",
+            "__v",
+            "files",
+        ];
+
+        Object.entries(formData).forEach(([key, value]) => {
+            if (FILE_FIELDS.includes(key) || ignoredFields.includes(key)) return;
+
+            if (key === "supervisors" || key === "labours") {
+                payload.append(
+                    key,
+                    JSON.stringify(Array.isArray(value) ? value : [])
+                );
+                return;
+            }
+
+            if (value !== undefined && value !== null && typeof value !== "object") {
+                payload.append(key, String(value));
+            }
+        });
+
+        FILE_FIELDS.forEach((field) => {
+            const selectedFiles = Array.isArray(formData[field])
+                ? formData[field]
+                : formData[field]
+                    ? [formData[field]]
+                    : [];
+
+            selectedFiles.forEach((file) => {
+                if (
+                    file &&
+                    typeof file === "object" &&
+                    typeof file.name === "string" &&
+                    typeof file.size === "number"
+                ) {
+                    payload.append(field, file);
+                }
+            });
+        });
+
+        return payload;
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // Safety: only submit from the Review step
+        if (currentStep < 5) return;
+
         setIsSubmitting(true);
 
         let allValid = true;
@@ -478,19 +596,21 @@ const AddNewProject = () => {
 
         for (let step = 1; step <= 4; step++) {
             const stepRules = validationRules[step];
-            if (stepRules) {
-                Object.keys(stepRules).forEach((field) => {
-                    const rule = stepRules[field];
-                    const value = formData[field];
-                    if (rule.required && !value) {
-                        allErrors[field] = rule.message;
-                        allValid = false;
-                    } else if (rule.pattern && value && !rule.pattern.test(value)) {
-                        allErrors[field] = rule.message;
-                        allValid = false;
-                    }
-                });
-            }
+            if (!stepRules) continue;
+
+            Object.keys(stepRules).forEach((field) => {
+                const error = runRule(stepRules[field], formData[field]);
+                if (error) {
+                    allErrors[field] = error;
+                    allValid = false;
+                }
+            });
+        }
+
+        const dateError = getDateOrderError(formData);
+        if (dateError) {
+            allErrors.expectedCompletionDate = dateError;
+            allValid = false;
         }
 
         setErrors((prev) => ({ ...prev, ...allErrors }));
@@ -500,47 +620,43 @@ const AddNewProject = () => {
         }));
 
         if (!allValid) {
-            alert("❌ Please fix all validation errors before submitting.");
+            toast.error("Please fix all validation errors before submitting.");
             const firstErrorField = Object.keys(allErrors)[0];
             const errorStep = Number(
-                Object.keys(validationRules).find((s) => validationRules[s][firstErrorField])
+                Object.keys(validationRules).find(
+                    (s) => validationRules[s][firstErrorField]
+                )
             );
+
             if (errorStep) setCurrentStep(errorStep);
             setIsSubmitting(false);
             return;
         }
 
         try {
+            const formPayload = buildProjectFormData();
+
             if (isEditMode) {
-                const formPayload = new FormData();
-                Object.entries(formData).forEach(([key, value]) => {
-                    formPayload.append(key, value);
-                });
-
-                if (isEditMode) {
-                    await updateProject({ id, formData }).unwrap();
-                    toast.success("Project updated successfully!");
-                }
-
-
-
-                // await updateProject({ id, formData: formPayload }).unwrap();
-                // toast.success("Project updated successfully!");
+                await updateProject({ id, formData: formPayload }).unwrap();
+                toast.success("Project updated successfully!");
             } else {
-                await addProject(formData).unwrap();
+                await addProject(formPayload).unwrap();
                 toast.success("Project created successfully!");
             }
 
             navigate(-1);
         } catch (error) {
             console.error("Error saving project:", error);
-            toast.error(isEditMode ? "Failed to update project" : "Failed to create project");
+            toast.error(
+                error?.data?.message ||
+                (isEditMode ? "Failed to update project" : "Failed to create project")
+            );
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    // ✅ Check if field is valid (for green border/icon)
+    // Check if field is valid (for green border/icon)
     const isFieldValid = (fieldName) =>
         touched[fieldName] && !errors[fieldName] && formData[fieldName];
 
@@ -559,6 +675,17 @@ const AddNewProject = () => {
             </div>
         );
     }
+
+    // Shortcut to keep the JSX below compact
+    const inputProps = (name) => ({
+        name,
+        value: formData[name],
+        onChange: handleInputChange,
+        onBlur: handleInputBlur,
+        error: errors[name],
+        touched: touched[name],
+        isValid: isFieldValid(name),
+    });
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30 p-4 md:p-6">
@@ -580,8 +707,7 @@ const AddNewProject = () => {
                             <p className="text-slate-600 text-sm md:text-base">
                                 {isEditMode
                                     ? `Editing: ${formData.projectName || "Project"}`
-                                    : "Fill in the project details step by step"
-                                }
+                                    : "Fill in the project details step by step"}
                             </p>
                         </div>
                     </div>
@@ -612,7 +738,7 @@ const AddNewProject = () => {
                             <div key={step} className="flex flex-col items-center relative z-10">
                                 <div
                                     className={`w-14 h-14 rounded-2xl flex items-center justify-center border-2 font-semibold transition-all duration-300 transform hover:scale-110 ${step === currentStep
-                                        ? " text-white border-blue-600 shadow-lg shadow-blue-500/25"
+                                        ? "bg-white text-blue-600 border-blue-600 shadow-lg shadow-blue-500/25"
                                         : step < currentStep
                                             ? "bg-green-500 text-white border-green-500 shadow-lg shadow-green-500/25"
                                             : "bg-white text-slate-400 border-slate-300"
@@ -669,7 +795,61 @@ const AddNewProject = () => {
                         </div>
 
                         <div className="p-6 md:p-8">
-                            {/* STEP 3 - Updated with Location Detection */}
+                            {/* STEP 1 */}
+                            {currentStep === 1 && (
+                                <div className="space-y-8">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <Input label="Project Name" {...inputProps("projectName")} />
+                                        <Input label="Client / Organization Name" {...inputProps("clientName")} />
+                                        <Select
+                                            label="Project Type"
+                                            options={[
+                                                "Industrial",
+                                                "Commercial",
+                                                "Residential",
+                                                "Institutional",
+                                                "Infrastructure",
+                                            ]}
+                                            {...inputProps("projectType")}
+                                        />
+                                        <Input label="Work Scope" {...inputProps("workScope")} />
+                                        <Select
+                                            label="Contract Type"
+                                            options={[
+                                                "Turnkey",
+                                                "Labour Rate Basis",
+                                                "Covered Area Square Feet",
+                                                "Covered Area Square metter",
+                                                "Item Rate",
+                                                "PMC",
+                                                "Consultancy",
+                                            ]}
+                                            {...inputProps("contractType")}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* STEP 2 */}
+                            {currentStep === 2 && (
+                                <div className="space-y-8">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        <Input type="date" label="Work Order / LOI Date" {...inputProps("workOrderDate")} />
+                                        <Input type="date" label="Expected Start Date" {...inputProps("expectedStartDate")} />
+                                        <Input type="date" label="Actual Start Date" {...inputProps("actualStartDate")} />
+                                        <Input type="date" label="Expected Completion Date" {...inputProps("expectedCompletionDate")} />
+                                        <Input type="date" label="Actual Completion Date" {...inputProps("actualCompletionDate")} />
+                                        <Input
+                                            name="projectDuration"
+                                            label="Project Duration"
+                                            value={formData.projectDuration}
+                                            readOnly
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* STEP 3 */}
                             {currentStep === 3 && (
                                 <div className="space-y-8">
                                     <div className="bg-blue-50/50 rounded-xl p-6 border border-blue-200">
@@ -678,16 +858,7 @@ const AddNewProject = () => {
                                         </h3>
                                         <div className="space-y-6">
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <Input
-                                                    name="siteLocation"
-                                                    label="Site Location / Address"
-                                                    value={formData.siteLocation}
-                                                    onChange={handleInputChange}
-                                                    onBlur={handleInputBlur}
-                                                    error={errors.siteLocation}
-                                                    touched={touched.siteLocation}
-                                                    isValid={isFieldValid("siteLocation")}
-                                                />
+                                                <Input label="Site Location / Address" {...inputProps("siteLocation")} />
 
                                                 {/* Current Location with GPS Button */}
                                                 <div className="space-y-2">
@@ -698,7 +869,7 @@ const AddNewProject = () => {
                                                         <input
                                                             name="currentLocation"
                                                             type="text"
-                                                            value={formData.currentLocation}
+                                                            value={formData.currentLocation ?? ""}
                                                             onChange={handleInputChange}
                                                             onBlur={handleInputBlur}
                                                             className="flex-1 p-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 hover:border-slate-300 transition-all duration-200"
@@ -734,321 +905,47 @@ const AddNewProject = () => {
 
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                                 <Select
-                                                    name="state"
                                                     label="State"
                                                     options={stateList?.map((st) => ({
                                                         label: st.name,
-                                                        value: st.isoCode
+                                                        value: st.isoCode,
                                                     }))}
-                                                    value={formData.state}
-                                                    onChange={(e) => {
-                                                        handleInputChange(e);
-                                                        setFormData((prev) => ({
-                                                            ...prev,
-                                                            state: e.target.value,
-                                                            city: "",
-                                                            pinCode: "",
-                                                        }));
-                                                    }}
-                                                    onBlur={handleInputBlur}
-                                                    error={errors.state}
-                                                    touched={touched.state}
-                                                    isValid={isFieldValid("state")}
+                                                    {...inputProps("state")}
                                                 />
-
                                                 <Select
-                                                    name="city"
                                                     label="City"
-                                                    options={City.getCitiesOfState("IN", formData.state).map((ct) => ({
+                                                    options={cityList.map((ct) => ({
                                                         label: ct.name,
-                                                        value: ct.name
+                                                        value: ct.name,
                                                     }))}
-                                                    value={formData.city}
                                                     disabled={!formData.state}
-                                                    onChange={handleInputChange}
-                                                    onBlur={handleInputBlur}
-                                                    error={errors.city}
-                                                    touched={touched.city}
-                                                    isValid={isFieldValid("city")}
+                                                    {...inputProps("city")}
                                                 />
-
-                                                <Input
-                                                    name="pinCode"
-                                                    label="PIN Code"
-                                                    value={formData.pinCode}
-                                                    onChange={handleInputChange}
-                                                    onBlur={handleInputBlur}
-                                                    error={errors.pinCode}
-                                                    touched={touched.pinCode}
-                                                    isValid={isFieldValid("pinCode")}
-                                                />
+                                                <Input label="PIN Code" {...inputProps("pinCode")} />
                                             </div>
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <Input
-                                                    name="siteArea"
-                                                    label="Site Area (Sqm)"
-                                                    value={formData.siteArea}
-                                                    onChange={handleInputChange}
-                                                    onBlur={handleInputBlur}
-                                                    error={errors.siteArea}
-                                                    touched={touched.siteArea}
-                                                    isValid={isFieldValid("siteArea")}
-                                                />
-                                                <Input
-                                                    name="builtUpArea"
-                                                    label="Built-up Area (Sqm)"
-                                                    value={formData.builtUpArea}
-                                                    onChange={handleInputChange}
-                                                    onBlur={handleInputBlur}
-                                                    error={errors.builtUpArea}
-                                                    touched={touched.builtUpArea}
-                                                    isValid={isFieldValid("builtUpArea")}
-                                                />
-                                                <Input
-                                                    name="landmark"
-                                                    label="Nearest Landmark"
-                                                    value={formData.landmark}
-                                                    onChange={handleInputChange}
-                                                    onBlur={handleInputBlur}
-                                                />
+                                                <Input label="Site Area (Sqm)" {...inputProps("siteArea")} />
+                                                <Input label="Built-up Area (Sqm)" {...inputProps("builtUpArea")} />
+                                                <Input label="Nearest Landmark" {...inputProps("landmark")} />
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Rest of STEP 3 remains the same */}
                                     <div className="bg-green-50/50 rounded-xl p-6 border border-green-200">
                                         <h3 className="text-lg font-semibold text-slate-900 mb-4">
                                             Client / Authorized Person
                                         </h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <Input
-                                                name="companyName"
-                                                label="Company Name"
-                                                value={formData.companyName}
-                                                onChange={handleInputChange}
-                                                onBlur={handleInputBlur}
-                                                error={errors.companyName}
-                                                touched={touched.companyName}
-                                                isValid={isFieldValid("companyName")}
-                                            />
-                                            <Input
-                                                name="gst"
-                                                label="GST No."
-                                                value={formData.gst}
-                                                onChange={handleInputChange}
-                                                onBlur={handleInputBlur}
-                                                error={errors.gst}
-                                                touched={touched.gst}
-                                                isValid={isFieldValid("gst")}
-                                            />
-                                            <Input
-                                                name="ownerName"
-                                                label="Owner Name"
-                                                value={formData.ownerName}
-                                                onChange={handleInputChange}
-                                                onBlur={handleInputBlur}
-                                            />
-                                            <Input
-                                                name="authorizedPerson"
-                                                label="Authorized Person Name"
-                                                value={formData.authorizedPerson}
-                                                onChange={handleInputChange}
-                                                onBlur={handleInputBlur}
-                                            />
-                                            <Input
-                                                name="designation"
-                                                label="Designation"
-                                                value={formData.designation}
-                                                onChange={handleInputChange}
-                                                onBlur={handleInputBlur}
-                                            />
-                                            <Input
-                                                name="contactNumber"
-                                                label="Contact Number"
-                                                value={formData.contactNumber}
-                                                onChange={handleInputChange}
-                                                onBlur={handleInputBlur}
-                                                error={errors.contactNumber}
-                                                touched={touched.contactNumber}
-                                                isValid={isFieldValid("contactNumber")}
-                                            />
-                                            <Input
-                                                name="email"
-                                                label="Email ID"
-                                                type="email"
-                                                value={formData.email}
-                                                onChange={handleInputChange}
-                                                onBlur={handleInputBlur}
-                                                error={errors.email}
-                                                touched={touched.email}
-                                                isValid={isFieldValid("email")}
-                                            />
-                                            <Input
-                                                name="alternateContact"
-                                                label="Alternate Contact"
-                                                value={formData.alternateContact}
-                                                onChange={handleInputChange}
-                                                onBlur={handleInputBlur}
-                                                error={errors.alternateContact}
-                                                touched={touched.alternateContact}
-                                                isValid={isFieldValid("alternateContact")}
-                                            />
+                                            <Input label="Company Name" {...inputProps("companyName")} />
+                                            <Input label="GST No." {...inputProps("gst")} />
+                                            <Input label="Owner Name" {...inputProps("ownerName")} />
+                                            <Input label="Authorized Person Name" {...inputProps("authorizedPerson")} />
+                                            <Input label="Designation" {...inputProps("designation")} />
+                                            <Input label="Contact Number" {...inputProps("contactNumber")} />
+                                            <Input label="Email ID" type="email" {...inputProps("email")} />
+                                            <Input label="Alternate Contact" {...inputProps("alternateContact")} />
                                         </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Other steps remain the same */}
-                            {currentStep === 1 && (
-                                <div className="space-y-8">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <Input
-                                            name="projectName"
-                                            label="Project Name"
-                                            value={formData.projectName}
-                                            onChange={handleInputChange}
-                                            onBlur={handleInputBlur}
-                                            error={errors.projectName}
-                                            touched={touched.projectName}
-                                            isValid={isFieldValid("projectName")}
-                                        />
-
-                                        <Input
-                                            name="clientName"
-                                            label="Client / Organization Name"
-                                            value={formData.clientName}
-                                            onChange={handleInputChange}
-                                            onBlur={handleInputBlur}
-                                            error={errors.clientName}
-                                            touched={touched.clientName}
-                                            isValid={isFieldValid("clientName")}
-                                        />
-
-                                        <Select
-                                            name="projectType"
-                                            label="Project Type"
-                                            options={[
-                                                "Industrial",
-                                                "Commercial",
-                                                "Residential",
-                                                "Institutional",
-                                                "Infrastructure",
-                                            ]}
-                                            value={formData.projectType}
-                                            onChange={handleInputChange}
-                                            onBlur={handleInputBlur}
-                                            error={errors.projectType}
-                                            touched={touched.projectType}
-                                            isValid={isFieldValid("projectType")}
-                                        />
-
-                                        <Input
-                                            name="workScope"
-                                            label="Work Scope"
-                                            value={formData.workScope}
-                                            onChange={handleInputChange}
-                                            onBlur={handleInputBlur}
-                                            error={errors.workScope}
-                                            touched={touched.workScope}
-                                            isValid={isFieldValid("workScope")}
-                                        />
-
-                                        <Select
-                                            name="contractType"
-                                            label="Contract Type"
-                                            options={[
-                                                "Turnkey",
-                                                "Labour Rate Basis",
-                                                "Covered Area Square Feet",
-                                                "Covered Area Square metter",
-                                                "Item Rate",
-                                                "PMC",
-                                                "Consultancy",
-                                            ]}
-                                            value={formData.contractType}
-                                            onChange={handleInputChange}
-                                            onBlur={handleInputBlur}
-                                            error={errors.contractType}
-                                            touched={touched.contractType}
-                                            isValid={isFieldValid("contractType")}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* STEP 2 */}
-                            {currentStep === 2 && (
-                                <div className="space-y-8">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        <Input
-                                            name="workOrderDate"
-                                            type="date"
-                                            label="Work Order / LOI Date"
-                                            value={formData.workOrderDate}
-                                            onChange={handleInputChange}
-                                            onBlur={handleInputBlur}
-                                            error={errors.workOrderDate}
-                                            touched={touched.workOrderDate}
-                                            isValid={isFieldValid("workOrderDate")}
-                                        />
-                                        <Input
-                                            name="expectedStartDate"
-                                            type="date"
-                                            label="Expected Start Date"
-                                            value={formData.expectedStartDate}
-                                            onChange={handleInputChange}
-                                            onBlur={handleInputBlur}
-                                            error={errors.expectedStartDate}
-                                            touched={touched.expectedStartDate}
-                                            isValid={isFieldValid("expectedStartDate")}
-                                        />
-                                        <Input
-                                            name="actualStartDate"
-                                            type="date"
-                                            label="Actual Start Date"
-                                            value={formData.actualStartDate}
-                                            onChange={handleInputChange}
-                                            onBlur={handleInputBlur}
-                                        />
-                                        <Input
-                                            name="expectedCompletionDate"
-                                            type="date"
-                                            label="Expected Completion Date"
-                                            value={formData.expectedCompletionDate}
-                                            onChange={handleInputChange}
-                                            onBlur={handleInputBlur}
-                                            error={errors.expectedCompletionDate}
-                                            touched={touched.expectedCompletionDate}
-                                            isValid={isFieldValid("expectedCompletionDate")}
-                                        />
-                                        <Input
-                                            name="actualCompletionDate"
-                                            type="date"
-                                            label="Actual Completion Date"
-                                            value={formData.actualCompletionDate}
-                                            onChange={handleInputChange}
-                                            onBlur={handleInputBlur}
-                                        />
-                                        {/* <Input
-                                            name="projectDuration"
-                                            label="Project Duration (Months)"
-                                            value={formData.projectDuration}
-                                            onChange={handleInputChange}
-                                            onBlur={handleInputBlur}
-                                            error={errors.projectDuration}
-                                            touched={touched.projectDuration}
-                                            isValid={isFieldValid("projectDuration")}
-                                        /> */}
-
-                                        <Input
-                                            name="projectDuration"
-                                            label="Project Duration"
-                                            value={formData.projectDuration}
-                                            readOnly
-                                        />
-
-
                                     </div>
                                 </div>
                             )}
@@ -1061,187 +958,133 @@ const AddNewProject = () => {
                                             <FaUserTie className="text-purple-600" /> Internal Details
                                         </h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
                                             <Select
-                                                name="projectIncharge"
                                                 label="Project In-Charge / Site Engineer"
-                                                options={data?.map((e) => ({
-                                                    label: `${e.name} (${e.role || "User"})`, // what you want to display
-                                                    value: e._id, // what will be stored
-                                                }))}
-                                                value={formData.projectIncharge}
-                                                onChange={handleInputChange}
-                                                onBlur={handleInputBlur}
-                                                error={errors.projectIncharge}
-                                                touched={touched.projectIncharge}
-                                                isValid={isFieldValid("projectIncharge")}
+                                                options={userOptions(supervisors)}
+                                                {...inputProps("projectIncharge")}
                                             />
-
                                             <Select
-                                                // name="projectManager"
-                                                name="managerId"
                                                 label="Project Manager"
-                                                options={data?.map((e) => ({
-                                                    label: `${e.name} (${e.role || "User"})`, // what you want to display
-                                                    value: e._id, // what will be stored
-                                                }))}
-                                                // value={formData.projectManager}
-                                                value={formData.managerId}
-                                                onChange={handleInputChange}
-                                                onBlur={handleInputBlur}
-                                                // error={errors.projectManager}
-                                                // touched={touched.projectManager}
-                                                // isValid={isFieldValid("projectManager")}
-                                                error={errors.managerId}
-                                                touched={touched.managerId}
-                                                isValid={isFieldValid("managerId")}
+                                                options={userOptions(managers)}
+                                                {...inputProps("managerId")}
                                             />
-
-
                                             <Select
                                                 name="supervisors"
                                                 label="Supervisor"
-                                                options={data?.map((e) => ({
-                                                    label: `${e.name} (${e.role || "User"})`,
-                                                    value: e._id,
-                                                }))}
+                                                options={userOptions(supervisors)}
                                                 value={formData.supervisors?.[0] || ""}
                                                 onChange={handleInputChange}
                                                 onBlur={handleInputBlur}
                                             />
-
-
-
-                                            {/* <Select
-                                                name="supervisors"
-                                                label="Supervisor"
-                                                options={data?.map((e) => ({
-                                                    label: `${e.name} (${e.role || "User"})`,
-                                                    value: e._id
-                                                }))}
-                                                value={formData.supervisors[0] || ""}
-                                            /> */}
-
-
                                             <Select
-                                                name="consultantArchitect"
                                                 label="Consultant / Architect"
-                                                options={data?.map((e) => ({
-                                                    label: `${e.name} (${e.role || "User"})`, // what you want to display
-                                                    value: e._id, // what will be stored
-                                                }))}
-                                                value={formData.consultantArchitect}
-                                                onChange={handleInputChange}
-                                                onBlur={handleInputBlur}
+                                                options={userOptions(consultants)}
+                                                {...inputProps("consultantArchitect")}
                                             />
-
-
-
                                             <Select
-                                                name="subcontractorVendor"
                                                 label="Subcontractor / Vendor"
-                                                options={data?.map((e) => ({
-                                                    label: `${e.name} (${e.role || "User"})`, // what you want to display
-                                                    value: e._id, // what will be stored
-                                                }))}
-                                                value={formData.subcontractorVendor}
-                                                onChange={handleInputChange}
-                                                onBlur={handleInputBlur}
+                                                options={userOptions(vendors)}
+                                                {...inputProps("subcontractorVendor")}
                                             />
-
                                         </div>
-
                                     </div>
 
                                     <div className="bg-orange-50/50 rounded-xl p-6 border border-orange-200">
                                         <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                                             <FaFileContract className="text-orange-600" /> Attachments
                                         </h3>
+                                        <p className="text-sm text-slate-500 mb-4">
+                                            You can select multiple files for every attachment (max 10 MB each).
+                                            {isEditMode && " New files are added to the existing ones."}
+                                        </p>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <File name="workOrderFile" label="Work Order Copy" onChange={handleInputChange} />
-                                            <File name="siteLayoutFile" label="Site Layout Plan" onChange={handleInputChange} />
-                                            <File name="drawingsFile" label="Project Drawings" onChange={handleInputChange} />
-                                            <File name="clientKycFile" label="Client KYC Documents" onChange={handleInputChange} />
-                                            <File name="projectPhotosFile" label="Project Photos" onChange={handleInputChange} />
-                                            <File name="notesFile" label="Special Instruction / Notes" onChange={handleInputChange} />
+                                            <FileUpload name="workOrderFile" label="Work Order Copy" onChange={handleInputChange} existingFiles={formData.files?.workOrderFile} />
+                                            <FileUpload name="siteLayoutFile" label="Site Layout Plan" onChange={handleInputChange} existingFiles={formData.files?.siteLayoutFile} />
+                                            <FileUpload name="drawingsFile" label="Project Drawings" onChange={handleInputChange} existingFiles={formData.files?.drawingsFile} />
+                                            <FileUpload name="clientKycFile" label="Client KYC Documents" onChange={handleInputChange} existingFiles={formData.files?.clientKycFile} />
+                                            <FileUpload name="projectPhotosFile" label="Project Photos" onChange={handleInputChange} existingFiles={formData.files?.projectPhotosFile} />
+                                            <FileUpload name="notesFile" label="Special Instruction / Notes" onChange={handleInputChange} existingFiles={formData.files?.notesFile} />
                                         </div>
                                     </div>
                                 </div>
                             )}
 
-                            {/* STEP 5 - Review Step */}
+                            {/* STEP 5 - Review */}
                             {currentStep === 5 && (
                                 <div className="space-y-6">
-                                    <div className="space-y-6">
-                                        <ReviewSection
-                                            title="General Project Details"
-                                            icon={<FiClipboard className="text-blue-600" />}
-                                            data={[
-                                                { label: "Project Name", value: formData.projectName },
-                                                { label: "Client Name", value: formData.clientName },
-                                                { label: "Project Code", value: formData.projectCode },
-                                                { label: "Project Type", value: formData.projectType },
-                                                { label: "Work Scope", value: formData.workScope },
-                                                { label: "Contract Type", value: formData.contractType },
-                                            ]}
-                                        />
-                                        <ReviewSection
-                                            title="Project Timeline"
-                                            icon={<FiCheck className="text-green-600" />}
-                                            data={[
-                                                { label: "Work Order Date", value: formData.workOrderDate },
-                                                { label: "Expected Start Date", value: formData.expectedStartDate },
-                                                { label: "Actual Start Date", value: formData.actualStartDate },
-                                                { label: "Expected Completion Date", value: formData.expectedCompletionDate },
-                                                { label: "Actual Completion Date", value: formData.actualCompletionDate },
-                                                {
-                                                    label: "Project Duration",
-                                                    value: formData.projectDuration ? `${formData.projectDuration} months` : "",
-                                                },
-                                            ]}
-                                        />
-                                        <ReviewSection
-                                            title="Site Information"
-                                            icon={<FiMapPin className="text-orange-600" />}
-                                            data={[
-                                                { label: "Site Location", value: formData.siteLocation },
-                                                { label: "Current Location", value: formData.currentLocation },
-                                                { label: "City", value: formData.city },
-                                                { label: "State", value: formData.state },
-                                                { label: "PIN Code", value: formData.pinCode },
-                                                { label: "Site Area", value: formData.siteArea ? `${formData.siteArea} sqm` : "" },
-                                                { label: "Built-up Area", value: formData.builtUpArea ? `${formData.builtUpArea} sqm` : "" },
-                                                { label: "Landmark", value: formData.landmark },
-                                            ]}
-                                        />
-                                        <ReviewSection
-                                            title="Client Details"
-                                            data={[
-                                                { label: "Company Name", value: formData.companyName },
-                                                { label: "GST No.", value: formData.gst },
-                                                { label: "Owner Name", value: formData.ownerName },
-                                                { label: "Authorized Person", value: formData.authorizedPerson },
-                                                { label: "Designation", value: formData.designation },
-                                                { label: "Contact Number", value: formData.contactNumber },
-                                                { label: "Email", value: formData.email },
-                                                { label: "Alternate Contact", value: formData.alternateContact },
-                                            ]}
-                                        />
-                                        <ReviewSection
-                                            title="Internal Details"
-                                            icon={<FaUserTie className="text-purple-600" />}
-                                            data={[
-                                                { label: "Project In-Charge", value: formData.projectIncharge },
-                                                // { label: "Project Manager", value: formData.projectManager },
-                                                { label: "Project Manager", value: formData.managerId },
-
-                                                { label: "Consultant Architect", value: formData.consultantArchitect },
-                                                { label: "Structural Consultant", value: formData.structuralConsultant },
-                                                { label: "supervisor", value: formData.supervisor },
-                                                { label: "Subcontractor/Vendor", value: formData.subcontractorVendor },
-                                            ]}
-                                        />
-                                    </div>
+                                    <ReviewSection
+                                        title="General Project Details"
+                                        icon={<FiClipboard className="text-blue-600" />}
+                                        data={[
+                                            { label: "Project Name", value: formData.projectName },
+                                            { label: "Client Name", value: formData.clientName },
+                                            { label: "Project Code", value: formData.projectCode },
+                                            { label: "Project Type", value: formData.projectType },
+                                            { label: "Work Scope", value: formData.workScope },
+                                            { label: "Contract Type", value: formData.contractType },
+                                        ]}
+                                    />
+                                    <ReviewSection
+                                        title="Project Timeline"
+                                        icon={<FiCheck className="text-green-600" />}
+                                        data={[
+                                            { label: "Work Order Date", value: formData.workOrderDate },
+                                            { label: "Expected Start Date", value: formData.expectedStartDate },
+                                            { label: "Actual Start Date", value: formData.actualStartDate },
+                                            { label: "Expected Completion Date", value: formData.expectedCompletionDate },
+                                            { label: "Actual Completion Date", value: formData.actualCompletionDate },
+                                            { label: "Project Duration", value: formData.projectDuration },
+                                        ]}
+                                    />
+                                    <ReviewSection
+                                        title="Site Information"
+                                        icon={<FiMapPin className="text-orange-600" />}
+                                        data={[
+                                            { label: "Site Location", value: formData.siteLocation },
+                                            { label: "Current Location", value: formData.currentLocation },
+                                            { label: "City", value: formData.city },
+                                            { label: "State", value: formData.state },
+                                            { label: "PIN Code", value: formData.pinCode },
+                                            { label: "Site Area", value: formData.siteArea ? `${formData.siteArea} sqm` : "" },
+                                            { label: "Built-up Area", value: formData.builtUpArea ? `${formData.builtUpArea} sqm` : "" },
+                                            { label: "Landmark", value: formData.landmark },
+                                        ]}
+                                    />
+                                    <ReviewSection
+                                        title="Client Details"
+                                        data={[
+                                            { label: "Company Name", value: formData.companyName },
+                                            { label: "GST No.", value: formData.gst },
+                                            { label: "Owner Name", value: formData.ownerName },
+                                            { label: "Authorized Person", value: formData.authorizedPerson },
+                                            { label: "Designation", value: formData.designation },
+                                            { label: "Contact Number", value: formData.contactNumber },
+                                            { label: "Email", value: formData.email },
+                                            { label: "Alternate Contact", value: formData.alternateContact },
+                                        ]}
+                                    />
+                                    <ReviewSection
+                                        title="Internal Details"
+                                        icon={<FaUserTie className="text-purple-600" />}
+                                        data={[
+                                            { label: "Project In-Charge", value: nameOf(formData.projectIncharge) },
+                                            { label: "Project Manager", value: nameOf(formData.managerId) },
+                                            { label: "Supervisor", value: formData.supervisors?.map(nameOf).join(", ") },
+                                            { label: "Consultant / Architect", value: nameOf(formData.consultantArchitect) },
+                                            { label: "Structural Consultant", value: nameOf(formData.structuralConsultant) },
+                                            { label: "Subcontractor/Vendor", value: nameOf(formData.subcontractorVendor) },
+                                        ]}
+                                    />
+                                    <ReviewSection
+                                        title="New Attachments"
+                                        icon={<FaFileContract className="text-orange-600" />}
+                                        data={FILE_FIELDS.map((field) => ({
+                                            label: field.replace("File", "").replace(/([A-Z])/g, " $1"),
+                                            value: formData[field]?.length
+                                                ? `${formData[field].length} file(s)`
+                                                : "",
+                                        }))}
+                                    />
                                 </div>
                             )}
                         </div>
@@ -1252,7 +1095,7 @@ const AddNewProject = () => {
                                 type="button"
                                 onClick={prevStep}
                                 disabled={currentStep === 1}
-                                className={`px-3 md:px-8 py-3 md:py-3 rounded-xl font-semibold transition-all flex items-center gap-2 ${currentStep === 1
+                                className={`px-3 md:px-8 py-3 rounded-xl font-semibold transition-all flex items-center gap-2 ${currentStep === 1
                                     ? "bg-slate-300 text-slate-500 cursor-not-allowed"
                                     : "bg-slate-600 text-white hover:bg-slate-700 shadow-sm hover:shadow-md transform hover:-translate-x-1"
                                     }`}
@@ -1268,7 +1111,7 @@ const AddNewProject = () => {
                                 <button
                                     type="button"
                                     onClick={nextStep}
-                                    className="px-3 md:px-8 py-3 md:py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transform hover:translate-x-1 transition-all flex items-center gap-2"
+                                    className="px-3 md:px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transform hover:translate-x-1 transition-all flex items-center gap-2"
                                 >
                                     Next Step <ArrowRight className="w-4 h-4" />
                                 </button>
@@ -1299,11 +1142,24 @@ const AddNewProject = () => {
     );
 };
 
-// ✅ Enhanced Input Component with real-time validation
-const Input = ({ name, label, type = "text", value, onChange, onBlur, error, touched, isValid }) => {
+// ============================================================
+// Input with real-time validation
+// ============================================================
+const Input = ({
+    name,
+    label,
+    type = "text",
+    value,
+    onChange,
+    onBlur,
+    error,
+    touched,
+    isValid,
+    readOnly = false,
+}) => {
     const getInputMode = () => {
         if (name === "contactNumber" || name === "alternateContact" || name === "pinCode") return "numeric";
-        if (name === "siteArea" || name === "builtUpArea" || name === "projectDuration") return "decimal";
+        if (name === "siteArea" || name === "builtUpArea") return "decimal";
         return "text";
     };
 
@@ -1324,19 +1180,22 @@ const Input = ({ name, label, type = "text", value, onChange, onBlur, error, tou
                 <input
                     name={name}
                     type={type}
-                    value={value}
+                    value={value ?? ""}
                     onChange={onChange}
                     onBlur={onBlur}
+                    readOnly={readOnly}
                     inputMode={getInputMode()}
                     maxLength={getMaxLength()}
-                    className={`w-full p-3 pr-10 border-2 rounded-xl focus:outline-none transition-all duration-200 ${error && touched
-                        ? "border-red-500 focus:border-red-500 bg-red-50/50"
-                        : isValid
-                            ? "border-green-500 focus:border-green-500 bg-green-50/50"
-                            : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 hover:border-slate-300"
+                    className={`w-full p-3 pr-10 border-2 rounded-xl focus:outline-none transition-all duration-200 ${readOnly
+                        ? "bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed"
+                        : error && touched
+                            ? "border-red-500 focus:border-red-500 bg-red-50/50"
+                            : isValid
+                                ? "border-green-500 focus:border-green-500 bg-green-50/50"
+                                : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 hover:border-slate-300"
                         }`}
                 />
-                {touched && (
+                {touched && !readOnly && (
                     <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                         {error ? (
                             <FiXCircle className="w-5 h-5 text-red-500" />
@@ -1356,10 +1215,22 @@ const Input = ({ name, label, type = "text", value, onChange, onBlur, error, tou
     );
 };
 
-// ✅ Enhanced Select Component with real-time validation
-const Select = ({ name, label, value, onChange, onBlur, options, error, touched, isValid }) => (
+// ============================================================
+// Select with real-time validation
+// ============================================================
+const Select = ({
+    name,
+    label,
+    value,
+    onChange,
+    onBlur,
+    options,
+    error,
+    touched,
+    isValid,
+    disabled = false,
+}) => (
     <div className="space-y-2">
-        {/* {console.log(options)} */}
         <label className="text-slate-700 text-sm font-semibold block">
             {label}
             {error && <span className="text-red-500 ml-1">*</span>}
@@ -1367,10 +1238,11 @@ const Select = ({ name, label, value, onChange, onBlur, options, error, touched,
         <div className="relative">
             <select
                 name={name}
-                value={value}
+                value={value ?? ""}
                 onChange={onChange}
                 onBlur={onBlur}
-                className={`w-full p-3 pr-10 border-2 rounded-xl focus:outline-none transition-all duration-200 appearance-none ${error && touched
+                disabled={disabled}
+                className={`w-full p-3 pr-10 border-2 rounded-xl focus:outline-none transition-all duration-200 appearance-none disabled:bg-slate-100 disabled:cursor-not-allowed ${error && touched
                     ? "border-red-500 focus:border-red-500 bg-red-50/50"
                     : isValid
                         ? "border-green-500 focus:border-green-500 bg-green-50/50"
@@ -1403,30 +1275,133 @@ const Select = ({ name, label, value, onChange, onBlur, options, error, touched,
     </div>
 );
 
-// ✅ File Input Component
-const File = ({ name, label, onChange }) => (
-    <div className="space-y-2">
-        <label className="text-slate-700 text-sm font-semibold block">{label}</label>
-        <div className="relative">
+// ============================================================
+// Multiple file input.
+// - shows already uploaded files (edit mode) with image thumbnails
+// - shows previews of newly selected files
+// ============================================================
+const FileUpload = ({ name, label, onChange, existingFiles }) => {
+    const [selectedFiles, setSelectedFiles] = useState([]);
+
+    const uploaded = toFileArray(existingFiles);
+
+    // Preview URLs for newly selected images
+    const previews = useMemo(
+        () =>
+            selectedFiles.map((file) => ({
+                name: file.name,
+                url: file.type?.startsWith("image/") ? URL.createObjectURL(file) : null,
+            })),
+        [selectedFiles]
+    );
+
+    // Free object URLs when selection changes / component unmounts
+    useEffect(
+        () => () => previews.forEach((p) => p.url && URL.revokeObjectURL(p.url)),
+        [previews]
+    );
+
+    const handleFiles = (e) => {
+        const files = Array.from(e.target.files || []);
+
+        setSelectedFiles(files);
+
+        onChange({
+            target: {
+                name,
+                type: "file",
+                files,
+                value: "",
+            },
+        });
+    };
+
+    return (
+        <div className="space-y-2">
+            <label className="text-slate-700 text-sm font-semibold block">{label}</label>
+
+            {/* Already uploaded files */}
+            {uploaded.length > 0 && (
+                <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
+                    <p className="text-xs font-semibold text-slate-600 mb-2">
+                        Already uploaded ({uploaded.length})
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        {uploaded.map((path, index) => {
+                            const url = getFileUrl(path);
+                            const fileName = getFileName(path);
+
+                            return (
+                                <a
+                                    key={`${path}-${index}`}
+                                    href={url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    title={fileName}
+                                    className="w-16 h-16 rounded-lg border bg-white overflow-hidden flex items-center justify-center hover:shadow-md transition"
+                                >
+                                    {isImageFile(path) ? (
+                                        <img
+                                            src={url}
+                                            alt={fileName}
+                                            loading="lazy"
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <FiFileText className="w-6 h-6 text-slate-400" />
+                                    )}
+                                </a>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
             <input
                 type="file"
                 name={name}
-                multiple       // ✅ this enables multiple file selection
-                onChange={(e) => onChange({
-                    target: {
-                        name,
-                        // ✅ convert FileList into array
-                        files: Array.from(e.target.files)
-                    }
-                })}
+                multiple
+                onChange={handleFiles}
                 className="w-full p-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 hover:border-slate-300 transition-all duration-200 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />
+
+            {/* Newly selected files */}
+            {previews.length > 0 && (
+                <div className="mt-2 rounded-lg bg-blue-50 border border-blue-100 p-3">
+                    <p className="text-xs font-semibold text-blue-700 mb-2">
+                        {previews.length} new file{previews.length > 1 ? "s" : ""} selected
+                    </p>
+
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                        {previews.map((p, index) => (
+                            <div
+                                key={`${p.name}-${index}`}
+                                className="flex items-center gap-2 text-xs text-slate-700"
+                            >
+                                {p.url ? (
+                                    <img
+                                        src={p.url}
+                                        alt={p.name}
+                                        className="w-8 h-8 rounded object-cover border"
+                                    />
+                                ) : (
+                                    <FiFileText className="w-8 h-8 p-1.5 text-slate-400" />
+                                )}
+                                <span className="truncate" title={p.name}>
+                                    {p.name}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
-    </div>
-);
+    );
+};
 
-
-// ✅ Review Section Component
+// ============================================================
+// Review Section
+// ============================================================
 const ReviewSection = ({ title, icon, data }) => (
     <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
         <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
@@ -1435,9 +1410,13 @@ const ReviewSection = ({ title, icon, data }) => (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {data?.map((item, index) => (
                 <div key={index} className="space-y-1">
-                    <label className="text-slate-600 text-sm font-medium">{item.label}</label>
+                    <label className="text-slate-600 text-sm font-medium capitalize">
+                        {item.label}
+                    </label>
                     <p className="text-slate-900 font-semibold">
-                        {item.value || <span className="text-slate-400 italic">Not provided</span>}
+                        {item.value || (
+                            <span className="text-slate-400 italic font-normal">Not provided</span>
+                        )}
                     </p>
                 </div>
             ))}

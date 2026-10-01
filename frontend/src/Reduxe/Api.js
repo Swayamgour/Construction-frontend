@@ -1,30 +1,5 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
-/**
- * ============================================================================
- * CENTRAL RTK QUERY API LAYER — corrected against the actual backend routes
- * (see backend/server.js for every app.use(...) mount) and extended with
- * every endpoint from the Feature Enhancement backend work:
- *   Labour transfer/overtime, Stock Request/Transfer/Procurement/Receiving/
- *   Inventory, Drawings, Machinery Request/Documents/Operator/Maintenance,
- *   EOD, Project Delay, Notifications, Audit history, Reports.
- *
- * Fixes made vs the previous version of this file:
- *  - deleteProject was calling "projects/delete/:id" (backend has no such
- *    route) -> fixed to "project/:id" (DELETE), matching projectRoutes.js.
- *  - getUsers was calling "/users" (route does not exist anywhere in the
- *    backend) -> fixed to "auth" (GET /api/auth/, admin-only, getAllUser).
- *  - deleteTask and getProjectStock were each declared TWICE with different
- *    URLs — in a JS object literal the second silently overwrote the first,
- *    permanently breaking one of the two features. Renamed the Gantt-scoped
- *    one to deleteGanttTask; getProjectStock kept pointing at the GRN
- *    module's version, and the plain stock module's version was added
- *    under a distinct name (getStockProjectBalance).
- *  - updateLabour called "labour/update/:id" — no matching backend route
- *    existed. FIXED both sides: added PUT /api/auth/labours/:id to the
- *    backend (authController.updateLabour) and pointed this hook at it.
- * ============================================================================
- */
 
 export const Api = createApi({
     reducerPath: "erpApi",
@@ -52,7 +27,7 @@ export const Api = createApi({
         "DrawingRequest", "DrawingVersion",
         "MachineRequest", "MachineDocument", "OperatorLog",
         "EOD", "Delay", "DelayCategory", "Notification", "Audit", "Dashboard",
-        "PurchaseOrder",
+        "PurchaseOrder", "LabourAttendance",
     ],
 
     endpoints: (build) => ({
@@ -324,7 +299,7 @@ export const Api = createApi({
         /* NEW: LABOUR WORKING TIME / OVERTIME */
         recordLabourWorkingTime: build.mutation({
             query: (body) => ({ url: "labour/attendance", method: "POST", body }),
-            invalidatesTags: ["Labour", "Reports"],
+            invalidatesTags: ["Labour", "Reports", "LabourAttendance"],
         }),
 
         getOvertimeRecords: build.query({
@@ -334,17 +309,17 @@ export const Api = createApi({
 
         approveOvertime: build.mutation({
             query: (id) => ({ url: `labour/overtime/${id}/approve`, method: "PATCH" }),
-            invalidatesTags: ["Reports", "Labour"],
+            invalidatesTags: ["Reports", "Labour", "LabourAttendance"],
         }),
 
         rejectOvertime: build.mutation({
             query: ({ id, reason }) => ({ url: `labour/overtime/${id}/reject`, method: "PATCH", body: { reason } }),
-            invalidatesTags: ["Reports", "Labour"],
+            invalidatesTags: ["Reports", "Labour", "LabourAttendance"],
         }),
 
         correctOvertime: build.mutation({
             query: ({ id, ...body }) => ({ url: `labour/overtime/${id}/correct`, method: "PATCH", body }),
-            invalidatesTags: ["Reports", "Labour"],
+            invalidatesTags: ["Reports", "Labour", "LabourAttendance"],
         }),
 
         getOvertimeSettings: build.query({
@@ -1032,6 +1007,11 @@ export const Api = createApi({
             providesTags: ["Employee"],
         }),
 
+        getAdminLabourAttendance: build.query({
+            query: (params) => ({ url: "attendance/labour/admin-workforce", params }),
+            providesTags: ["Labour", "Reports"],
+        }),
+
         getPendingEmployeeAttendance: build.query({
             query: () => "attendance/employee/pending",
             providesTags: ["Employee"],
@@ -1050,34 +1030,76 @@ export const Api = createApi({
         /* =====================================================================
            LABOUR ATTENDANCE (legacy simple mark, kept as-is)
            ===================================================================== */
+        // Manual single mark (Absent / Half-Day / manual Present)
         attendanceMark: build.mutation({
             query: (body) => ({ url: "attendance/labour/mark", method: "POST", body }),
-            invalidatesTags: ["Labour"],
+            invalidatesTags: ["Labour", "LabourAttendance", "Reports"],
         }),
 
+        // Active labours assigned to a project (plain array response)
         getLaboursByProject: build.query({
             query: (projectId) => `attendance/labour/list?projectId=${projectId}`,
             providesTags: ["Labour"],
         }),
 
         getTodaysPresentLabours: build.query({
-            query: () => `attendance/TodaysPresentLabours/list`,
-            providesTags: ["Labour"],
+            query: (params) => ({ url: "attendance/TodaysPresentLabours/list", params }),
+            providesTags: ["Labour", "LabourAttendance"],
         }),
 
+        // Bulk manual mark: use for Absent / Half-Day. timeIn/timeOut must be "HH:mm".
         bulkMarkLabour: build.mutation({
             query: (body) => ({ url: "attendance/labour/mark-bulk", method: "POST", body }),
-            invalidatesTags: ["Labour"],
+            invalidatesTags: ["Labour", "LabourAttendance", "Reports"],
         }),
 
+        // Marking screen: every assigned labour + today's record + state
+        // state = "Not Marked" | "Punched In" | "Completed" | "Absent"
+        getLabourTodayStatus: build.query({
+            query: (projectId) => ({ url: "attendance/labour/today-status", params: { projectId } }),
+            providesTags: ["LabourAttendance"],
+        }),
+
+        // body: plain object, or FormData when a selfie is attached (field name: "selfie")
+        punchInLabour: build.mutation({
+            query: (body) => ({ url: "attendance/labour/punch-in", method: "POST", body }),
+            invalidatesTags: ["LabourAttendance", "Reports"],
+        }),
+
+        // body: { projectId, labourId, checkOutTime?, date? }
+        punchOutLabour: build.mutation({
+            query: (body) => ({ url: "attendance/labour/punch-out", method: "POST", body }),
+            invalidatesTags: ["LabourAttendance", "Reports"],
+        }),
+
+        // role scoped: admin = all, manager/supervisor = own projects
         getPendingLabourAttendance: build.query({
-            query: () => "attendance/labour/pending",
-            providesTags: ["Labour"],
+            query: (params) => ({ url: "attendance/labour/pending", params }),
+            providesTags: ["LabourAttendance"],
         }),
 
+        // history / report: ?projectId&labourId&status&approvalStatus&overtimeStatus&from&to&page&limit
+        getLabourAttendanceRecords: build.query({
+            query: (params) => ({ url: "attendance/labour/records", params }),
+            providesTags: ["LabourAttendance"],
+        }),
+
+        // admin only. body: { attendanceId, approveOvertime? }
         approveLabourAttendance: build.mutation({
             query: (data) => ({ url: "attendance/labour/approve", method: "POST", body: data }),
-            invalidatesTags: ["Labour"],
+            invalidatesTags: ["Labour", "LabourAttendance", "Reports"],
+        }),
+
+        // admin only. body: { attendanceIds: [], approveOvertime? }
+        approveBulkLabourAttendance: build.mutation({
+            query: (data) => ({ url: "attendance/labour/approve-bulk", method: "POST", body: data }),
+            invalidatesTags: ["Labour", "LabourAttendance", "Reports"],
+        }),
+
+        // admin only. body: { attendanceId, reason }
+        rejectLabourAttendance: build.mutation({
+            query: (data) => ({ url: "attendance/labour/reject", method: "POST", body: data }),
+            invalidatesTags: ["LabourAttendance", "Reports"],
         }),
 
         todayReport: build.query({
@@ -1491,6 +1513,12 @@ export const {
     useBulkMarkLabourMutation,
     useGetPendingLabourAttendanceQuery,
     useApproveLabourAttendanceMutation,
+    useApproveBulkLabourAttendanceMutation,
+    useRejectLabourAttendanceMutation,
+    useGetLabourTodayStatusQuery,
+    usePunchInLabourMutation,
+    usePunchOutLabourMutation,
+    useGetLabourAttendanceRecordsQuery,
     useTodayReportQuery,
     useSummaryReportQuery,
     useMonthlyReportQuery,
@@ -1532,6 +1560,7 @@ export const {
     useOrderPurchaseOrderMutation,
     useCancelPurchaseOrderMutation,
     useClosePurchaseOrderMutation,
+    useGetAdminLabourAttendanceQuery
 } = Api;
 
 export default Api;

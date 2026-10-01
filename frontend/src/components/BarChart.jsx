@@ -359,7 +359,7 @@ const ConstructionDashboard = () => {
                 </div>
 
                 <div className="space-y-4">
-                  {projectsData.map((project) => (
+                  {projectsData?.map((project) => (
                     <div key={project.id} className="bg-slate-50 rounded-2xl p-4 border border-slate-200 hover:border-blue-300 transition-all duration-300 group">
                       <div className="flex items-start justify-between mb-3">
                         <div>

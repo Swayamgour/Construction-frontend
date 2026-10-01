@@ -1,294 +1,278 @@
 import React, { useEffect, useState } from "react";
-import {
-    useAddLabourMutation,
-    useUpdateLabourMutation,
-    useGetLabourByIdQuery
-} from "../../Reduxe/Api";
-
-import { X, Save } from "lucide-react";
+import { useAddLabourMutation, useUpdateLabourMutation, useGetLabourByIdQuery } from "../../Reduxe/Api";
+import { motion } from "framer-motion";
+import { X, Save, User, Phone, MapPin, HardHat, Wallet, Gauge, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
+const inputCls =
+  "w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all";
+const selectCls =
+  "w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all";
+
 const LabourForm = ({ labourId, onClose, onSave }) => {
-    const { data: labourData } = useGetLabourByIdQuery(labourId, {
-        skip: !labourId
-    });
+  const { data: labourData } = useGetLabourByIdQuery(labourId, { skip: !labourId });
 
-    const [addLabour] = useAddLabourMutation();
-    const [updateLabour] = useUpdateLabourMutation();
+  const [addLabour] = useAddLabourMutation();
+  const [updateLabour] = useUpdateLabourMutation();
 
-    const navigate = useNavigate();
+  const navigate = useNavigate();
 
-    const initialState = {
-        name: "",
-        labourType: "Permanent Labour",
-        category: "Labour",
-        wageType: "Daily",
-        dailyWage: "",
-        monthlySalary: "",
-        skillLevel: "Unskilled",
-        phone: "",
-        address: "",
-        projectAssigned: "",
-        status: "Active"
-    };
+  const initialState = {
+    name: "",
+    labourType: "Permanent Labour",
+    category: "Labour",
+    wageType: "Daily",
+    dailyWage: "",
+    monthlySalary: "",
+    skillLevel: "Unskilled",
+    phone: "",
+    address: "",
+    projectAssigned: "",
+    status: "Active",
+  };
 
-    const [formData, setFormData] = useState(initialState);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState(null);
+  const [formData, setFormData] = useState(initialState);
+  const [isLoading, setIsLoading] = useState(false);
 
-    const isEditMode = !!labourId;
+  const isEditMode = !!labourId;
 
-    // Load Data in Edit Mode
-    useEffect(() => {
-        if (labourData?.data && isEditMode) {
-            const labour = labourData.data;
-            setFormData({
-                ...labour,
-                projectAssigned: labour.projectAssigned?._id || "",
-                dailyWage: labour.dailyWage?.toString() || "",
-                monthlySalary: labour.monthlySalary?.toString() || ""
-            });
-        }
-    }, [labourData, isEditMode]);
+  useEffect(() => {
+    if (labourData?.data && isEditMode) {
+      const labour = labourData.data;
+      setFormData({
+        ...labour,
+        projectAssigned: labour.projectAssigned?._id || "",
+        dailyWage: labour.dailyWage?.toString() || "",
+        monthlySalary: labour.monthlySalary?.toString() || "",
+      });
+    }
+  }, [labourData, isEditMode]);
 
-    // Auto skillLevel for Operator
-    useEffect(() => {
-        if (formData.category === "Operator") {
-            setFormData(prev => ({ ...prev, skillLevel: "Skilled" }));
-        }
-    }, [formData.category]);
+  useEffect(() => {
+    if (formData.category === "Operator") {
+      setFormData((prev) => ({ ...prev, skillLevel: "Skilled" }));
+    }
+  }, [formData.category]);
 
-    // Handle Change
-    const handleChange = (e) => {
-        const { name, value } = e.target;
+  const handleChange = (e) => {
+    const { name, value } = e.target;
 
-        if (name === "phone") {
-            if (!/^\d*$/.test(value)) return;
-            if (value.length > 10) return;
-        }
+    if (name === "phone") {
+      if (!/^\d*$/.test(value)) return;
+      if (value.length > 10) return;
+    }
 
-        if (name === "dailyWage" || name === "monthlySalary") {
-            if (!/^\d*$/.test(value)) return;
-            if (value.length > 6) return;
-        }
+    if (name === "dailyWage" || name === "monthlySalary") {
+      if (!/^\d*$/.test(value)) return;
+      if (value.length > 6) return;
+    }
 
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
-    // Submit
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError(null);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-        if (!formData.name || !formData.phone || !formData.address) {
-            toast.error("Required fields missing!");
-            return;
-        }
+    if (!formData.name || !formData.phone || !formData.address) {
+      toast.error("Required fields missing!");
+      return;
+    }
 
-        if (formData.phone.length !== 10) {
-            toast.error("Phone number must be 10 digits!");
-            return;
-        }
+    if (formData.phone.length !== 10) {
+      toast.error("Phone number must be 10 digits!");
+      return;
+    }
 
-        setIsLoading(true);
+    setIsLoading(true);
 
-        try {
-            if (isEditMode) {
-                await updateLabour({
-                    id: labourId,
-                    ...formData,
-                    dailyWage: Number(formData.dailyWage),
-                    monthlySalary: Number(formData.monthlySalary)
-                }).unwrap();
+    try {
+      if (isEditMode) {
+        await updateLabour({
+          id: labourId,
+          ...formData,
+          dailyWage: Number(formData.dailyWage),
+          monthlySalary: Number(formData.monthlySalary),
+        }).unwrap();
 
-                toast.success("Updated Successfully");
-                navigate(-1);
-            } else {
-                await addLabour({
-                    ...formData,
-                    dailyWage: Number(formData.dailyWage),
-                    monthlySalary: Number(formData.monthlySalary),
-                    projectAssigned: formData.projectAssigned || null
-                }).unwrap();
+        toast.success("Updated Successfully");
+        navigate(-1);
+      } else {
+        await addLabour({
+          ...formData,
+          dailyWage: Number(formData.dailyWage),
+          monthlySalary: Number(formData.monthlySalary),
+          projectAssigned: formData.projectAssigned || null,
+        }).unwrap();
 
-                toast.success("Added Successfully");
-                navigate(-1);
-            }
+        toast.success("Added Successfully");
+        navigate(-1);
+      }
 
-            onSave();
-            onClose();
+      // Guarded — this form is also mounted directly as a route with no
+      // parent-supplied callbacks, so calling these unconditionally
+      // used to throw right after a successful save.
+      onSave?.();
+      onClose?.();
+    } catch (err) {
+      toast.error(err?.data?.message || "Error saving data!");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-        } catch (err) {
-            // toast.error(err?.data?.message || "Error saving data!");
-            console.log(err)
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
-
-                <div className="bg-blue-600 p-6 text-white flex justify-between items-center">
-                    <h2 className="text-xl font-bold">
-                        {isEditMode ? "Edit Worker" : "Add New Worker"}
-                    </h2>
-                    <button onClick={() => navigate(-1)}>
-                        <X size={22} />
-                    </button>
-                </div>
-
-                <div className="p-6 overflow-y-auto max-h-[80vh]">
-                    <form onSubmit={handleSubmit} className="space-y-6">
-
-                        {/* NAME + PHONE */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block font-semibold mb-1">Name *</label>
-                                <input
-                                    type="text"
-                                    name="name"
-                                    value={formData.name}
-                                    onChange={handleChange}
-                                    className="w-full p-3 border rounded-xl"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block font-semibold mb-1">Phone *</label>
-                                <input
-                                    type="text"
-                                    name="phone"
-                                    value={formData.phone}
-                                    onChange={handleChange}
-                                    className="w-full p-3 border rounded-xl"
-                                />
-                            </div>
-                        </div>
-
-                        {/* ADDRESS */}
-                        <div>
-                            <label className="block font-semibold mb-1">Address *</label>
-                            <textarea
-                                name="address"
-                                value={formData.address}
-                                onChange={handleChange}
-                                className="w-full p-3 border rounded-xl"
-                            />
-                        </div>
-
-                        {/* Category + LabourType */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block font-semibold mb-1">Category</label>
-                                <select
-                                    name="category"
-                                    value={formData.category}
-                                    onChange={handleChange}
-                                    className="w-full p-3 border rounded-xl"
-                                >
-                                    <option value="Labour">Labour</option>
-                                    <option value="Mistri">Mistri</option>
-                                    <option value="Operator">Operator</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block font-semibold mb-1">Type</label>
-                                <select
-                                    name="labourType"
-                                    value={formData.labourType}
-                                    onChange={handleChange}
-                                    className="w-full p-3 border rounded-xl"
-                                >
-                                    <option>Permanent Labour</option>
-                                    <option>Contract Labour</option>
-                                    <option>Permanent Mistri</option>
-                                    <option>Contract Mistri</option>
-                                    <option>Permanent Operator</option>
-                                    <option>Contract Operator</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* Skill */}
-                        <div>
-                            <label className="block font-semibold mb-1">Skill Level</label>
-                            <select
-                                name="skillLevel"
-                                value={formData.skillLevel}
-                                onChange={handleChange}
-                                className="w-full p-3 border rounded-xl"
-                                disabled={formData.category === "Operator"} // auto-skilled
-                            >
-                                <option>Unskilled</option>
-                                <option>Semi-skilled</option>
-                                <option>Skilled</option>
-                            </select>
-                        </div>
-
-                        {/* Wage */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block font-semibold mb-1">Wage Type</label>
-                                <select
-                                    name="wageType"
-                                    value={formData.wageType}
-                                    onChange={handleChange}
-                                    className="w-full p-3 border rounded-xl"
-                                >
-                                    <option value="Daily">Daily</option>
-                                    <option value="Monthly">Monthly</option>
-                                </select>
-                            </div>
-
-                            {formData.wageType === "Daily" && (
-                                <div>
-                                    <label className="block font-semibold mb-1">Daily Wage</label>
-                                    <input
-                                        type="text"
-                                        name="dailyWage"
-                                        value={formData.dailyWage}
-                                        onChange={handleChange}
-                                        className="w-full p-3 border rounded-xl"
-                                    />
-                                </div>
-                            )}
-
-                            {formData.wageType === "Monthly" && (
-                                <div>
-                                    <label className="block font-semibold mb-1">Monthly Salary</label>
-                                    <input
-                                        type="text"
-                                        name="monthlySalary"
-                                        value={formData.monthlySalary}
-                                        onChange={handleChange}
-                                        className="w-full p-3 border rounded-xl"
-                                    />
-                                </div>
-                            )}
-                        </div>
-
-                        {/* BUTTONS */}
-                        <div className="flex justify-end gap-3">
-                            {/* <button type="button" onClick={onClose} className="px-4 py-2 border rounded-xl">
-                                Cancel
-                            </button> */}
-
-                            <button type="submit" disabled={isLoading}
-                                className="px-6 py-2 bg-blue-600 text-white rounded-xl flex items-center gap-2">
-                                {isLoading ? "Saving..." : <Save size={18} />}
-                                {isEditMode ? "Update" : "Add Worker"}
-                            </button>
-                        </div>
-
-                    </form>
-                </div>
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden"
+      >
+        <div className="bg-gradient-to-r from-indigo-600 to-blue-600 p-6 text-white flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center">
+              <HardHat size={18} />
             </div>
+            <h2 className="text-xl font-bold">{isEditMode ? "Edit Worker" : "Add New Worker"}</h2>
+          </div>
+          <button onClick={() => navigate(-1)} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
+            <X size={20} />
+          </button>
         </div>
-    );
+
+        <div className="p-6 overflow-y-auto max-h-[80vh]">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* NAME + PHONE */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Name *</label>
+                <div className="relative">
+                  <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input type="text" name="name" value={formData.name} onChange={handleChange} className={inputCls} />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Phone *</label>
+                <div className="relative">
+                  <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input type="text" name="phone" value={formData.phone} onChange={handleChange} className={inputCls} />
+                </div>
+              </div>
+            </div>
+
+            {/* ADDRESS */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Address *</label>
+              <div className="relative">
+                <MapPin size={16} className="absolute left-3.5 top-3.5 text-gray-400" />
+                <textarea
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  rows={2}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+
+            {/* Category + LabourType */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Category</label>
+                <select name="category" value={formData.category} onChange={handleChange} className={selectCls}>
+                  <option value="Labour">Labour</option>
+                  <option value="Mistri">Mistri</option>
+                  <option value="Operator">Operator</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Type</label>
+                <select name="labourType" value={formData.labourType} onChange={handleChange} className={selectCls}>
+                  <option>Permanent Labour</option>
+                  <option>Contract Labour</option>
+                  <option>Permanent Mistri</option>
+                  <option>Contract Mistri</option>
+                  <option>Permanent Operator</option>
+                  <option>Contract Operator</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Skill */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5">
+                <Gauge size={13} /> Skill Level
+              </label>
+              <select
+                name="skillLevel"
+                value={formData.skillLevel}
+                onChange={handleChange}
+                className={`${selectCls} disabled:bg-gray-100 disabled:text-gray-400`}
+                disabled={formData.category === "Operator"}
+              >
+                <option>Unskilled</option>
+                <option>Semi-skilled</option>
+                <option>Skilled</option>
+              </select>
+            </div>
+
+            {/* Wage */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5">
+                  <Wallet size={13} /> Wage Type
+                </label>
+                <select name="wageType" value={formData.wageType} onChange={handleChange} className={selectCls}>
+                  <option value="Daily">Daily</option>
+                  <option value="Monthly">Monthly</option>
+                </select>
+              </div>
+
+              {formData.wageType === "Daily" && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Daily Wage (₹)</label>
+                  <input
+                    type="text"
+                    name="dailyWage"
+                    value={formData.dailyWage}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                  />
+                </div>
+              )}
+
+              {formData.wageType === "Monthly" && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Monthly Salary (₹)</label>
+                  <input
+                    type="text"
+                    name="monthlySalary"
+                    value={formData.monthlySalary}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* BUTTONS */}
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 disabled:opacity-70 text-white rounded-xl flex items-center gap-2 font-semibold shadow-lg shadow-indigo-900/20 transition-all"
+              >
+                {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                {isEditMode ? "Update" : "Add Worker"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </motion.div>
+    </div>
+  );
 };
 
 export default LabourForm;

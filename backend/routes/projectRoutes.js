@@ -1,4 +1,5 @@
 import express from "express";
+
 import {
     createProject,
     assignManager,
@@ -10,7 +11,7 @@ import {
     assignLabour,
     getSupervisorProjects,
     updateProject,
-    getMyProjects
+    getMyProjects,
 } from "../controllers/projectController.js";
 
 import { auth } from "../middleware/auth.js";
@@ -18,52 +19,174 @@ import { roleCheck } from "../middleware/role.js";
 import { checkProjectAccess } from "../middleware/projectAccess.js";
 import upload from "../middleware/upload.js";
 
+import mongoose from "mongoose";
+import User from "../models/User.js";
+import Project from "../models/Project.js";
 
 const router = express.Router();
 
-// CREATE PROJECT (admin only)
-// router.post("/create", auth, roleCheck("admin"), createProject);
+const isValidObjectId = (id) => {
+    return mongoose.Types.ObjectId.isValid(id);
+};
+/**
+ * ============================================================
+ * PROJECT FILE UPLOAD CONFIGURATION
+ * ============================================================
+ *
+ * Frontend must send exactly these field names.
+ *
+ * Multiple files are supported for every field.
+ */
+const projectFileFields = [
+    {
+        name: "workOrderFile",
+        maxCount: 20,
+    },
+    {
+        name: "siteLayoutFile",
+        maxCount: 20,
+    },
+    {
+        name: "drawingsFile",
+        maxCount: 20,
+    },
+    {
+        name: "clientKycFile",
+        maxCount: 20,
+    },
+    {
+        name: "projectPhotosFile",
+        maxCount: 50,
+    },
+    {
+        name: "notesFile",
+        maxCount: 20,
+    },
+];
+
+
+/**
+ * ============================================================
+ * CREATE PROJECT
+ * ============================================================
+ *
+ * Only admin can create project.
+ *
+ * multer must execute BEFORE createProject controller.
+ */
 router.post(
     "/create",
     auth,
     roleCheck("admin"),
-    upload.fields([
-        { name: "workOrderFile" },
-        { name: "siteLayoutFile" },
-        { name: "drawingsFile" },
-        { name: "clientKycFile" },
-        { name: "projectPhotosFile" },
-        { name: "notesFile" },
-    ]),
+    upload.fields(projectFileFields),
     createProject
 );
 
 
-// UPDATE PROJECT (admin + manager)
-router.put("/update/:id", auth, roleCheck("admin", "manager"), updateProject);
+/**
+ * ============================================================
+ * UPDATE PROJECT
+ * ============================================================
+ *
+ * Admin + Manager can update.
+ *
+ * Existing files are preserved by controller.
+ * New files are appended.
+ */
+router.put(
+    "/update/:id",
+    auth,
+    roleCheck("admin", "manager"),
+    upload.fields(projectFileFields),
+    updateProject
+);
 
-// ASSIGN MANAGER (admin only)
-router.post("/assign-manager", auth, roleCheck("admin"), assignManager);
 
-// OPTIONAL (manager or admin)
-router.get("/", auth, roleCheck("admin", "manager", "supervisor"), getAllProjects);
+/**
+ * ============================================================
+ * ASSIGN MANAGER
+ * ============================================================
+ *
+ * Admin only.
+ */
+router.post(
+    "/assign-manager",
+    auth,
+    roleCheck("admin"),
+    assignManager
+);
 
-// Get Manager Projects
-router.get("/my-projects", auth, getManagerProjects);
 
-// Get Supervisor Projects
-router.get("/my-supervisor-projects", auth, getSupervisorProjects);
+/**
+ * ============================================================
+ * GET ALL PROJECTS
+ * ============================================================
+ *
+ * Admin:
+ *   all projects
+ *
+ * Manager:
+ *   only own projects
+ *
+ * Supervisor:
+ *   projects where supervisor is assigned
+ */
+router.get(
+    "/",
+    auth,
+    roleCheck("admin", "manager", "supervisor"),
+    getAllProjects
+);
 
-router.get("/assign/my", auth, getMyProjects);
+
+/**
+ * ============================================================
+ * MANAGER PROJECTS
+ * ============================================================
+ */
+router.get(
+    "/my-projects",
+    auth,
+    roleCheck("manager"),
+    getManagerProjects
+);
 
 
-// GET SINGLE PROJECT
-router.get("/:id", auth, checkProjectAccess("id"), getProjectById);
+/**
+ * ============================================================
+ * SUPERVISOR PROJECTS
+ * ============================================================
+ */
+router.get(
+    "/my-supervisor-projects",
+    auth,
+    roleCheck("supervisor"),
+    getSupervisorProjects
+);
 
-// DELETE PROJECT (admin only)
-router.delete("/:id", auth, roleCheck("admin"), deleteProject);
 
-// ASSIGN SUPERVISOR
+/**
+ * ============================================================
+ * CURRENT USER PROJECTS
+ * ============================================================
+ *
+ * Admin / Manager / Supervisor
+ */
+router.get(
+    "/assign/my",
+    auth,
+    roleCheck("admin", "manager", "supervisor"),
+    getMyProjects
+);
+
+
+/**
+ * ============================================================
+ * ASSIGN SUPERVISOR
+ * ============================================================
+ *
+ * Admin + Manager.
+ */
 router.post(
     "/assign-supervisor",
     auth,
@@ -71,7 +194,50 @@ router.post(
     assignSupervisor
 );
 
-// ASSIGN LABOUR
+
+/**
+ * ============================================================
+ * ASSIGN LABOUR
+ * ============================================================
+ *
+ * Admin + Manager + Supervisor.
+ */
+router.post(
+    "/assign-labour",
+    auth,
+    roleCheck("admin", "manager", "supervisor"),
+    assignLabour
+);
+
+
+/**
+ * ============================================================
+ * GET SINGLE PROJECT
+ * ============================================================
+ *
+ * Access is checked by projectAccess middleware.
+ */
+router.get(
+    "/:id",
+    auth,
+    checkProjectAccess("id"),
+    getProjectById
+);
+
+
+/**
+ * ============================================================
+ * DELETE PROJECT
+ * ============================================================
+ *
+ * Admin only.
+ */
+router.delete(
+    "/:id",
+    auth,
+    roleCheck("admin"),
+    deleteProject
+);
 
 
 export default router;

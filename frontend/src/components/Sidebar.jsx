@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, UserPlus, Layers, Store, ClipboardList, Users,
   Factory, BarChart2, Boxes, ChevronDown, ArrowRightLeft,
@@ -7,25 +8,19 @@ import {
   PanelLeftClose, PanelLeftOpen, LogOut, X, History, ShieldCheck,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { APP_NAME } from "../config/brand";
+import { getInitials, getAvatarGradient } from "../helper/avatar";
 
 // ⚡ ROLE-BASED NAV — grouped into sections so the sidebar reads like a
 // menu instead of a flat wall of links. `roles` is preserved exactly
 // from the old flat list, so permissions behave the same as before —
 // only the presentation changed.
 const NAV_GROUPS = [
-  // {
-  //   label: "Overview",
-  //   items: [
-  //     { name: "Dashboard", icon: LayoutDashboard, path: "/dashboard", roles: ["admin", "manager", "supervisor", "storekeeper", "drawing_manager"] },
-  //     { name: "Manager Dashboard", icon: BarChart2, path: "/pm/dashboard", roles: ["manager"] },
-  //   ],
-  // },
   {
     label: "Projects",
     items: [
       { name: "All Projects", icon: Layers, path: "/Product", roles: ["admin"] },
       { name: "My Projects", icon: Layers, path: "/AssignProject", roles: ["manager", "supervisor"] },
-      // { name: "Gantt Chart", icon: ClipboardList, path: "/AddGanttTask", roles: ["admin", "manager", "supervisor"] },
     ],
   },
   {
@@ -33,28 +28,36 @@ const NAV_GROUPS = [
     items: [
       { name: "Labour Manage", icon: Users, path: "/LabourDashboard", roles: ["admin", "manager", "supervisor"] },
       { name: "Assign Labour", icon: Users, path: "/AssignLabour", roles: ["manager", "supervisor"] },
-      { name: "Attendance Labour", icon: ClipboardList, path: "/AttendanceLabour", roles: ["admin", "manager"] },
-      { name: "Approve Attendance", icon: ClipboardList, path: "/employee/pending", roles: ["admin"] },
-      { name: "Labour Transfer", icon: ArrowRightLeft, path: "/labour/transfer", roles: ["admin", "manager", "supervisor"] },
-      { name: "Record Working Time", icon: Clock, path: "/labour/record-working-time", roles: ["admin", "manager", "supervisor"] },
-      { name: "Labour Overtime", icon: Clock, path: "/labour/overtime", roles: ["admin", "manager", "supervisor"] },
+
+      { name: "Attendance / Workforce", icon: ClipboardList, path: "/attendance/workforce", roles: ["admin"] },
+      { name: "Attendance Labour", icon: ClipboardList, path: "/AttendanceLabour", roles: ["manager", "supervisor"] },
+
+
+      { name: "Labour Transfer", icon: ArrowRightLeft, path: "/labour/transfer", roles: ["manager", "supervisor"] },
+      // { name: "Labour Transfer History", icon: History, path: "/labour/full-history", roles: ["admin"] },
+      { name: "Overtime Requests", icon: Clock, path: "/labour/overtime", roles: ["admin"] },
+      { name: "Labour Overtime", icon: Clock, path: "/labour/overtime", roles: ["manager", "supervisor"] },
       { name: "Project Active Labour", icon: Users, path: "/labour/project-active", roles: ["admin", "manager", "supervisor"] },
       { name: "Labour Full History", icon: History, path: "/labour/full-history", roles: ["admin", "manager", "supervisor"] },
       { name: "Overtime Settings", icon: Clock, path: "/labour/overtime-settings", roles: ["admin", "manager"] },
     ],
   },
   {
+    label: "Employees Attendance",
+    items: [
+      { name: "Approve Attendance", icon: ClipboardList, path: "/employee/pending", roles: ["admin"] },
+    ]
+
+  },
+  {
     label: "Materials & Stock",
     items: [
       { name: "Stock Overview", icon: Boxes, path: "/StockOverView", roles: ["supervisor", "admin", "manager"] },
-      { name: "Stock Manage", icon: Boxes, path: "/StockPage", roles: ["supervisor", "admin", "manager"] },
-      // "Approve Stock" and "Material Approval" used to be two separate
-      // entries pointing at the exact same page — merged into one so
-      // it doesn't look like two different features.
+      { name: "Stock Manage", icon: Boxes, path: "/StockPage", roles: ["supervisor", "manager"] },
       { name: "Material Approval", icon: BarChart2, path: "/MaterialApproval", roles: ["admin", "manager"] },
       { name: "Stock Requests", icon: Boxes, path: "/stock/requests", roles: ["admin", "manager", "supervisor", "storekeeper"] },
-      { name: "Procurement", icon: Store, path: "/procurement", roles: ["admin", "manager", "storekeeper"] },
-      { name: "Stock Operations", icon: ArrowRightLeft, path: "/stock/operations", roles: ["admin", "manager", "storekeeper"] },
+      { name: "Procurement", icon: Store, path: "/procurement", roles: ["manager", "storekeeper"] },
+      { name: "Stock Operations", icon: ArrowRightLeft, path: "/stock/operations", roles: ["manager", "storekeeper"] },
     ],
   },
   {
@@ -80,12 +83,6 @@ const NAV_GROUPS = [
       { name: "Project Delays", icon: AlertTriangle, path: "/project-delays", roles: ["admin", "manager", "supervisor"] },
     ],
   },
-  // {
-  //   label: "Reports",
-  //   items: [
-  //     { name: "Reports & Dashboard", icon: BarChart2, path: "/reports-hub", roles: ["admin", "manager", "supervisor", "storekeeper", "accountant"] },
-  //   ],
-  // },
   {
     label: "Administration",
     items: [
@@ -103,9 +100,6 @@ const ROLE_STYLES = {
   drawing_manager: "bg-pink-500/15 text-pink-300 border-pink-500/30",
 };
 
-const initials = (name = "") =>
-  name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") || "U";
-
 const Sidebar = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, data }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -118,7 +112,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, data })
     const g = NAV_GROUPS.find((grp) =>
       grp.items.some((it) => location.pathname.startsWith(it.path))
     );
-    return g ? { [g.label]: true } : { Overview: true };
+    return g ? { [g.label]: true } : {};
   });
 
   const visibleGroups = useMemo(
@@ -149,16 +143,22 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, data })
   return (
     <>
       {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm lg:hidden z-[9990]"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm lg:hidden z-[9990]"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
       <aside
-        className={`fixed lg:sticky top-0 z-[9999] h-screen bg-slate-900 text-slate-200
-        flex flex-col transition-[width,transform] duration-300 ease-in-out
+        className={`fixed lg:sticky top-0 z-[9999] h-screen bg-gradient-to-b from-slate-900 to-slate-950 text-slate-200
+        flex flex-col border-r border-white/5 shadow-2xl shadow-black/40
+        transition-[width,transform] duration-300 ease-in-out
         ${collapsed ? "lg:w-[76px]" : "lg:w-64"}
         w-72 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
       >
@@ -166,19 +166,19 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, data })
         <div className="flex items-center justify-between h-16 px-4 border-b border-white/10 shrink-0">
           <div
             onClick={() => handleItemClick("/dashboard")}
-            className="flex items-center gap-3 cursor-pointer overflow-hidden"
+            className="flex items-center gap-3 cursor-pointer overflow-hidden group"
           >
-            <div className="w-9 h-9 shrink-0 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-indigo-900/40">
-              SS
+            <div className="w-9 h-9 shrink-0 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-indigo-900/40 group-hover:scale-105 transition-transform">
+              {getInitials(APP_NAME)}
             </div>
             {!collapsed && (
-              <span className="font-bold text-white tracking-wide whitespace-nowrap">
-                S S Construction
+              <span className="font-bold text-white tracking-wide whitespace-nowrap truncate">
+                {APP_NAME}
               </span>
             )}
           </div>
           <button
-            className="lg:hidden p-1.5 rounded-lg hover:bg-white/10 text-slate-300"
+            className="lg:hidden p-1.5 rounded-lg hover:bg-white/10 text-slate-300 transition-colors"
             onClick={() => setSidebarOpen(false)}
           >
             <X size={18} />
@@ -203,9 +203,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, data })
               )}
 
               <div
-                className={`space-y-0.5 overflow-hidden transition-all duration-200 ${
-                  collapsed || openGroups[grp.label] ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
-                }`}
+                className={`space-y-0.5 overflow-hidden transition-all duration-200 ${collapsed || openGroups[grp.label] ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
+                  }`}
               >
                 {grp.items.map((item, i) => {
                   const Icon = item.icon;
@@ -215,12 +214,19 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, data })
                       key={item.path + i}
                       title={collapsed ? item.name : undefined}
                       onClick={() => handleItemClick(item.path)}
-                      className={`group relative w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl text-sm font-medium transition-all
+                      className={`group relative w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl text-sm font-medium transition-all overflow-hidden
                         ${collapsed ? "justify-center" : ""}
                         ${active
-                          ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-md shadow-indigo-900/30"
+                          ? "text-white shadow-md shadow-indigo-900/30"
                           : "text-slate-300 hover:bg-white/5 hover:text-white"}`}
                     >
+                      {active && (
+                        <motion.span
+                          layoutId="sidebar-active-pill"
+                          transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                          className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl -z-10"
+                        />
+                      )}
                       <Icon size={18} className="shrink-0" />
                       {!collapsed && <span className="truncate">{item.name}</span>}
                       {collapsed && (
@@ -247,8 +253,13 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, data })
         {/* User footer */}
         <div className="border-t border-white/10 p-3 shrink-0">
           <div className={`flex items-center gap-3 rounded-xl px-2 py-2 ${collapsed ? "justify-center" : ""}`}>
-            <div className="w-9 h-9 shrink-0 rounded-full bg-slate-700 flex items-center justify-center text-white text-xs font-semibold">
-              {initials(userName)}
+            <div className="relative shrink-0">
+              <div
+                className={`w-9 h-9 rounded-full bg-gradient-to-br ${getAvatarGradient(userName)} flex items-center justify-center text-white text-xs font-semibold`}
+              >
+                {getInitials(userName)}
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-slate-900" />
             </div>
             {!collapsed && (
               <div className="min-w-0 flex-1">

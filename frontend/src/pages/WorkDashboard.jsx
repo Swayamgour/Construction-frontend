@@ -260,7 +260,7 @@ const WorkDashboard = () => {
                         onChange={(e) => setSelectedProject(e.target.value)}
                     >
                         <option value="">All Projects</option>
-                        {projectsData.map((p) => (
+                        {projectsData?.map((p) => (
                             <option key={p.name} value={p.name}>
                                 {p.name}
                             </option>
@@ -273,7 +273,7 @@ const WorkDashboard = () => {
                         onChange={(e) => setSelectedCategory(e.target.value)}
                     >
                         <option value="">All Categories</option>
-                        {[...new Set(projectsData.map((p) => p.category))].map((cat) => (
+                        {[...new Set(projectsData?.map((p) => p.category))].map((cat) => (
                             <option key={cat}>{cat}</option>
                         ))}
                     </select>
@@ -295,7 +295,7 @@ const WorkDashboard = () => {
                         onChange={(e) => setSelectedStatus(e.target.value)}
                     >
                         <option value="">All Status</option>
-                        {[...new Set(projectsData.map((p) => p.status))].map((status) => (
+                        {[...new Set(projectsData?.map((p) => p.status))].map((status) => (
                             <option key={status}>{status}</option>
                         ))}
                     </select>

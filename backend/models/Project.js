@@ -1,5 +1,10 @@
 import mongoose from "mongoose";
 
+const fileArray = {
+    type: [String],
+    default: [],
+};
+
 const projectSchema = new mongoose.Schema(
     {
         // BASIC PROJECT DETAILS
@@ -41,7 +46,7 @@ const projectSchema = new mongoose.Schema(
         actualCompletionDate: String,
         projectDuration: String,
 
-        // PROJECT INCHARGE (USER)
+        // PROJECT INCHARGE
         projectIncharge: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
@@ -59,33 +64,30 @@ const projectSchema = new mongoose.Schema(
             {
                 type: mongoose.Schema.Types.ObjectId,
                 ref: "User",
-                default: null
-            }
+            },
         ],
 
         labours: [
             {
                 type: mongoose.Schema.Types.ObjectId,
-                ref: "Labour",   // ✅ Correct Fix
-                default: null
-            }
+                ref: "Labour",
+            },
         ],
 
-
-
-        // CONSULTANTS
+        // CONSULTANTS / VENDORS
         consultantArchitect: String,
         structuralConsultant: String,
         subcontractorVendor: String,
 
-        // DOCUMENTS
+        // DOCUMENTS / ATTACHMENTS
+        // Every field is an array so multiple files can be uploaded.
         files: {
-            workOrderFile: String,
-            siteLayoutFile: String,
-            drawingsFile: String,
-            clientKycFile: String,
-            projectPhotosFile: String,
-            notesFile: String,
+            workOrderFile: fileArray,
+            siteLayoutFile: fileArray,
+            drawingsFile: fileArray,
+            clientKycFile: fileArray,
+            projectPhotosFile: fileArray,
+            notesFile: fileArray,
         },
 
         // CREATED BY ADMIN

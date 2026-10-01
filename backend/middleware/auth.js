@@ -28,11 +28,11 @@ export const auth = async (req, res, next) => {
         const user = await User.findById(decoded.id)
             .select("_id name role projectId assignedProjects status");
 
-        console.log("========== DATABASE USER ==========");
-        console.log(user);
-        console.log("projectId:", user?.projectId);
-        console.log("assignedProjects:", user?.assignedProjects);
-        console.log("==================================");
+        // console.log("========== DATABASE USER ==========");
+        // console.log(user);
+        // console.log("projectId:", user?.projectId);
+        // console.log("assignedProjects:", user?.assignedProjects);
+        // console.log("==================================");
 
         if (!user) {
             return res.status(401).json({

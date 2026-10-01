@@ -1,61 +1,28 @@
-
-
 import React, { useState } from "react";
 import { IoIosAddCircleOutline } from "react-icons/io";
 import { useNavigate } from "react-router-dom";
-import CreateProjectForm from "../components/CreateProjectForm";
 import {
     FaMapMarkerAlt,
-    FaEllipsisV,
     FaClock,
     FaCalendarCheck,
     FaRocket,
-    FaEye,
-    FaEdit,
-    FaTrash,
     FaSearch,
     FaBriefcase,
     FaChartLine,
     FaCalendarAlt
 } from "react-icons/fa";
-import { useDeleteProjectMutation, useGetProjectsQuery } from "../Reduxe/Api";
+import { useGetProjectsQuery } from "../Reduxe/Api";
+import { getAvatarGradient } from "../helper/avatar";
 
 const AttendanceLabour = () => {
     const navigate = useNavigate();
-    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
-    const [activeMenu, setActiveMenu] = useState(null);
     const { data: projects, isLoading } = useGetProjectsQuery();
-    const [deleteProject] = useDeleteProjectMutation();
 
-    const toggleDrawer = () => {
-        setIsDrawerOpen(!isDrawerOpen);
-    };
 
-    const toggleMenu = (projectId) => {
-        setActiveMenu(activeMenu === projectId ? null : projectId);
-    };
 
-    const handleDelete = async (projectId) => {
-        if (window.confirm("Are you sure you want to delete this project?")) {
-            try {
-                await deleteProject(projectId).unwrap();
-                setActiveMenu(null);
-            } catch (error) {
-                console.error("Failed to delete project:", error);
-            }
-        }
-    };
 
-    const handleViewDetails = (project) => {
-        navigate("/DashboardProject", { state: { project } });
-        setActiveMenu(null);
-    };
 
-    const handleEdit = (project) => {
-        navigate("/EditProject", { state: { projectId: project } });
-        setActiveMenu(null);
-    };
 
     const getProgressColor = (progress) => {
         if (progress < 25) return "bg-gradient-to-r from-red-400 to-red-500";
@@ -131,11 +98,11 @@ const AttendanceLabour = () => {
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
                     <div className="flex-1">
                         <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-slate-900 via-blue-800 to-purple-700 bg-clip-text text-transparent">
-                            Project Portfolio
+                            Labour Attendance
                         </h1>
                         <p className="text-gray-600 mt-2 flex items-center">
                             <span className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></span>
-                            Manage and track all your construction projects in one place
+                            Select a project to punch labour in and out
                         </p>
                     </div>
 
@@ -248,9 +215,6 @@ const AttendanceLabour = () => {
                                     <th className="px-6 py-5 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
                                         Status
                                     </th>
-                                    <th className="px-6 py-5 text-right text-sm font-bold text-gray-700 uppercase tracking-wider">
-                                        Actions
-                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200/60">
@@ -262,19 +226,26 @@ const AttendanceLabour = () => {
                                         <tr
                                             key={project._id}
                                             className="hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/50 transition-all duration-200 cursor-pointer group"
-                                            // onClick={() => navigate("/DashboardProject", { state: { project } })}
-                                            onClick={() => navigate(`/projects/${project._id}/attendance`)}
+                                                            onClick={() => navigate(`/projects/${project._id}/attendance`)}
                                         >
                                             {/* Project Details */}
                                             <td className="px-6 py-5">
                                                 <div className="flex items-center space-x-4">
-                                                    <div className="flex-shrink-0 w-14 h-14 rounded-2xl overflow-hidden shadow-lg group-hover:shadow-xl transition-shadow">
-                                                        <img
-                                                            src="./images/cons.jpg"
-                                                            alt={project.projectName}
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    </div>
+                                                    {project.image ? (
+                                                        <div className="flex-shrink-0 w-14 h-14 rounded-2xl overflow-hidden shadow-lg group-hover:shadow-xl transition-shadow">
+                                                            <img
+                                                                src={project.image}
+                                                                alt={project.projectName}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <div
+                                                            className={`flex-shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center text-white text-lg font-bold shadow-lg group-hover:shadow-xl transition-shadow bg-gradient-to-br ${getAvatarGradient(project.projectName)}`}
+                                                        >
+                                                            {project.projectName?.[0]?.toUpperCase() || "P"}
+                                                        </div>
+                                                    )}
                                                     <div className="min-w-0 flex-1">
                                                         <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
                                                             {project.projectName}
@@ -349,50 +320,6 @@ const AttendanceLabour = () => {
                                                 </div>
                                             </td>
 
-                                            {/* Actions */}
-                                            <td className="px-6 py-5 text-right">
-                                                <div className="relative flex justify-end">
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            toggleMenu(project._id);
-                                                        }}
-                                                        className="p-3 rounded-xl bg-gray-100 hover:bg-gray-200 transition-all duration-200 group/menu"
-                                                    >
-                                                        <FaEllipsisV className="text-gray-600 group-hover/menu:text-gray-800" />
-                                                    </button>
-
-                                                    {activeMenu === project._id && (
-                                                        <div
-                                                            className="absolute right-0 top-12 w-56 bg-white rounded-2xl shadow-2xl py-3 border border-gray-200 z-50 backdrop-blur-sm"
-                                                            onClick={(e) => e.stopPropagation()}
-                                                        >
-                                                            <button
-                                                                onClick={() => handleViewDetails(project)}
-                                                                className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 group/action"
-                                                            >
-                                                                <FaEye className="mr-3 text-blue-500 group-hover/action:scale-110 transition-transform" />
-                                                                View Details
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleEdit(project)}
-                                                                className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-600 transition-all duration-200 group/action"
-                                                            >
-                                                                <FaEdit className="mr-3 text-green-500 group-hover/action:scale-110 transition-transform" />
-                                                                Edit Project
-                                                            </button>
-                                                            <div className="border-t border-gray-200 my-1"></div>
-                                                            <button
-                                                                onClick={() => handleDelete(project._id)}
-                                                                className="flex items-center w-full px-4 py-3 text-sm text-red-700 hover:bg-red-50 hover:text-red-600 transition-all duration-200 group/action"
-                                                            >
-                                                                <FaTrash className="mr-3 text-red-500 group-hover/action:scale-110 transition-transform" />
-                                                                Delete Project
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </td>
                                         </tr>
                                     );
                                 })}
@@ -426,8 +353,6 @@ const AttendanceLabour = () => {
                 </div>
             </div>
 
-            {/* Drawer Form */}
-            <CreateProjectForm isOpen={isDrawerOpen} onClose={toggleDrawer} />
         </div>
     );
 };

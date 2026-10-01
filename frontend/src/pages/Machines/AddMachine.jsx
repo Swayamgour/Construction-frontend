@@ -17,6 +17,7 @@ export default function AddMachine() {
 
     const [files, setFiles] = useState({
         photo: null,
+        photos: [],
         rcFile: null,
         insuranceFile: null
     });
@@ -34,7 +35,10 @@ export default function AddMachine() {
 
         const fd = new FormData();
         Object.entries(form).forEach(([k, v]) => fd.append(k, v));
-        Object.entries(files).forEach(([k, v]) => v && fd.append(k, v));
+        if (files.photo) fd.append("photo", files.photo);
+        files.photos.forEach((file) => fd.append("photos", file));
+        if (files.rcFile) fd.append("rcFile", files.rcFile);
+        if (files.insuranceFile) fd.append("insuranceFile", files.insuranceFile);
 
         try {
             await addMachine(fd).unwrap();
@@ -53,6 +57,7 @@ export default function AddMachine() {
             });
             setFiles({
                 photo: null,
+                photos: [],
                 rcFile: null,
                 insuranceFile: null
             });
@@ -180,6 +185,14 @@ export default function AddMachine() {
                                             </div>
                                         </label>
                                     </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Additional Machine Images</label>
+                                    <input type="file" multiple accept="image/jpeg,image/png,image/webp"
+                                      onChange={(e) => setFiles((prev) => ({ ...prev, photos: Array.from(e.target.files || []) }))}
+                                      className="w-full border rounded-lg p-3 text-sm" />
+                                    {files.photos.length > 0 && <div className="grid grid-cols-4 gap-2 mt-2">{files.photos.map((f,i)=><span key={i} className="text-xs truncate border rounded p-1">{f.name}</span>)}</div>}
                                 </div>
 
                                 <div>

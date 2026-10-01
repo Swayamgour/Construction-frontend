@@ -14,6 +14,7 @@ import {
 
 export default function PMDashboard() {
     const { data: projectsData, isLoading } = useGetProjectsQuery();
+    console.log(projectsData)
 
     // console.log(projectsData)
 
@@ -26,7 +27,7 @@ export default function PMDashboard() {
     // 📌 Use REAL DATA from API
     useEffect(() => {
         if (projectsData) {
-            const updatedProjects = projectsData?.map(p => ({
+            const updatedProjects = projectsData?.data?.map(p => ({
                 _id: p._id,
                 name: p.projectName,
                 clientName: p.clientName,
@@ -208,7 +209,7 @@ export default function PMDashboard() {
                             </div>
                         ) : (
                             <div className="grid gap-4">
-                                {filteredprojects?.data?.map(p => (
+                                {projects?.data?.map(p => (
                                     <div onClick={() => navigate("/DashboardProject", { state: { project: p } })} key={p._id} className="group p-6 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-300 bg-gradient-to-r from-white to-gray-50/50">
                                         <div className="flex flex-col lg:flex-row lg:items-center justify-between">
                                             <div className="flex-1 mb-4 lg:mb-0">

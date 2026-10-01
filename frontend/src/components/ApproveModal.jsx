@@ -166,7 +166,7 @@ export default function ApproveModal({ open, mr, vendors, onClose }) {
                             onChange={(e) => setSingleVendorId(e.target.value)}
                         >
                             <option value="">Choose vendor...</option>
-                            {vendors?.map((v) => (
+                            {vendors?.data?.map((v) => (
                                 <option value={v._id} key={v._id}>
                                     {v.companyName}
                                 </option>

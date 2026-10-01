@@ -1,26 +1,23 @@
 import express from "express";
 import { auth } from "../middleware/auth.js";
 import { roleCheck } from "../middleware/role.js";
-import upload from "../middleware/upload.js";
+import { selfieUpload } from "../middleware/upload.js";
 import { checkProjectAccess } from "../middleware/projectAccess.js";
-import Attendance from "../models/Attendance.js";
-
-// approveLabourAttendance takes attendanceId in the body, not params —
-// resolve the record's projectId from there before checking access.
-const approveAttendanceProject = async (req) => {
-    const { attendanceId } = req.body || {};
-    if (!attendanceId) return null;
-    const record = await Attendance.findById(attendanceId).select("projectId");
-    return record?.projectId || null;
-};
+import { getAdminLabourAttendance } from "../controllers/adminAttendanceController.js";
 
 import {
     markLabourAttendance,
     markBulkLabourAttendance,
+    punchInLabour,
+    punchOutLabour,
     approveLabourAttendance,
+    approveBulkLabourAttendance,
+    rejectLabourAttendance,
     getPendingLabourAttendance,
+    getLabourAttendanceRecords,
     getLaboursByProject,
-    getTodaysPresentLabours
+    getLabourTodayStatus,
+    getTodaysPresentLabours,
 } from "../controllers/labourAttendanceController.js";
 
 import {
@@ -31,19 +28,55 @@ import {
     getEmployeeList,
     getEmployeeAttendanceByDate,
     employeePunchOut,
-    getMyAttendance
+    getMyAttendance,
 } from "../controllers/employeeAttendanceController.js";
 
 import {
     getTodayAttendanceReport,
     getProjectSummaryReport,
-    getMonthlyAttendanceReport
+    getMonthlyAttendanceReport,
 } from "../controllers/attendanceReportController.js";
 
 const router = express.Router();
 
 /* ------------------------ LABOUR ATTENDANCE -------------------------- */
 
+// Admin: all projects workforce view
+router.get(
+    "/labour/admin-workforce",
+    auth,
+    roleCheck("admin"),
+    getAdminLabourAttendance
+);
+
+// Marking screen: assigned labours + today's state (Not Marked / Punched In / Completed)
+router.get(
+    "/labour/today-status",
+    auth,
+    roleCheck("admin", "manager", "supervisor"),
+    checkProjectAccess(),
+    getLabourTodayStatus
+);
+
+// --- Step 1: supervisor / manager marks attendance ---
+router.post(
+    "/labour/punch-in",
+    auth,
+    roleCheck("supervisor", "manager"),
+    selfieUpload.single("selfie"), // optional photo
+    checkProjectAccess(),
+    punchInLabour
+);
+
+router.post(
+    "/labour/punch-out",
+    auth,
+    roleCheck("supervisor", "manager"),
+    checkProjectAccess(),
+    punchOutLabour
+);
+
+// manual: Absent / Half-Day / manual Present
 router.post(
     "/labour/mark",
     auth,
@@ -60,20 +93,41 @@ router.post(
     markBulkLabourAttendance
 );
 
+// --- Step 2: ADMIN approves / rejects ---
 router.post(
     "/labour/approve",
     auth,
-    roleCheck("manager", "admin"),
-    checkProjectAccess(approveAttendanceProject),
+    roleCheck("admin"),
     approveLabourAttendance
 );
 
+router.post(
+    "/labour/approve-bulk",
+    auth,
+    roleCheck("admin"),
+    approveBulkLabourAttendance
+);
+
+router.post(
+    "/labour/reject",
+    auth,
+    roleCheck("admin"),
+    rejectLabourAttendance
+);
+
+// --- Views (admin: all, manager / supervisor: own projects) ---
 router.get(
     "/labour/pending",
     auth,
-    roleCheck("manager", "admin"),
-    checkProjectAccess(),
+    roleCheck("admin", "manager", "supervisor"),
     getPendingLabourAttendance
+);
+
+router.get(
+    "/labour/records",
+    auth,
+    roleCheck("admin", "manager", "supervisor"),
+    getLabourAttendanceRecords
 );
 
 router.get(
@@ -88,36 +142,19 @@ router.get(
     "/TodaysPresentLabours/list",
     auth,
     roleCheck("admin", "manager", "supervisor"),
-    checkProjectAccess(),
     getTodaysPresentLabours
 );
 
-
 /* ------------------------- EMPLOYEE ATTENDANCE ------------------------ */
-
-
-
-// router.post(
-//     "/employee/mark",
-//     auth,
-//     roleCheck("admin", "manager", "supervisor"),
-//     // upload.memory.single("selfie"),   // <<--- IMPORTANT
-//     upload.disk.single("selfie"),
-//     markEmployeeAttendance
-// );
 
 router.post(
     "/employee/mark",
     auth,
     roleCheck("admin", "manager", "supervisor", "storekeeper", "accountant", "operator"),
-    upload.single("selfie"),
+    selfieUpload.single("selfie"),
     markEmployeeAttendance
 );
 
-
-
-
-// optional bulk employee marking (admin/manager)
 router.post(
     "/employee/mark-bulk",
     auth,
@@ -139,7 +176,7 @@ router.get(
     getEmployeeList
 );
 
-// get attendance by query date ?date=2025-12-03
+// ?date=2025-12-03
 router.get(
     "/employee/by-date",
     auth,
@@ -149,8 +186,6 @@ router.get(
 
 router.get("/employee/my", auth, getMyAttendance);
 
-
-// pending employee approvals
 router.get(
     "/employee/pending",
     auth,
@@ -158,7 +193,6 @@ router.get(
     getPendingEmployeeAttendance
 );
 
-// employee punch-out (updates today's record)
 router.post(
     "/employee/punch-out",
     auth,
@@ -166,24 +200,29 @@ router.post(
     employeePunchOut
 );
 
-
 /* ----------------------------- REPORTS ------------------------------- */
 
 router.get(
     "/reports/today/:projectId",
     auth,
+    roleCheck("admin", "manager", "supervisor"),
+    checkProjectAccess("projectId"),
     getTodayAttendanceReport
 );
 
 router.get(
     "/reports/summary/:projectId",
     auth,
+    roleCheck("admin", "manager", "supervisor"),
+    checkProjectAccess("projectId"),
     getProjectSummaryReport
 );
 
 router.get(
     "/reports/monthly/:projectId",
     auth,
+    roleCheck("admin", "manager", "supervisor"),
+    checkProjectAccess("projectId"),
     getMonthlyAttendanceReport
 );
 

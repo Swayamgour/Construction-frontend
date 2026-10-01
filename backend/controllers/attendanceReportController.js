@@ -2,68 +2,70 @@ import Attendance from "../models/Attendance.js";
 import EmployeeAttendance from "../models/EmployeeAttendance.js";
 import Labour from "../models/Labour.js";
 
-/* helper */
 const startOfDay = (d = new Date()) => {
     const dt = new Date(d);
     dt.setHours(0, 0, 0, 0);
     return dt;
 };
 
+const nextDay = (d) => {
+    const dt = new Date(d);
+    dt.setDate(dt.getDate() + 1);
+    return dt;
+};
+
 /* ======================================================
-   1️⃣ TODAY ATTENDANCE REPORT  (Labour + Employee Both)
+   1) TODAY ATTENDANCE REPORT (Labour + Employee)
    ====================================================== */
 export const getTodayAttendanceReport = async (req, res) => {
     try {
         const { projectId } = req.params;
         const today = startOfDay();
+        const dateRange = { $gte: today, $lt: nextDay(today) };
 
-        // 🔹 Labour attendance (for project)
-        const labourAttendance = await Attendance.find({
-            projectId,
-            date: today
-        })
+        const labourAttendance = await Attendance.find({ projectId, date: dateRange })
             .populate("labourId", "name phone skillLevel")
             .populate("markedBy", "name")
             .populate("approvedBy", "name");
 
-        // 🔹 Employee attendance (if employees are not project-scoped we return all for today)
-        const employeeAttendance = await EmployeeAttendance.find({
-            date: today
-        })
-            .populate("employeeId", "name phone role")
-            .populate("markedBy", "name")
-            .populate("approvedBy", "name");
+        // Employees are not project-scoped, so only admin/manager get them
+        let employeeAttendance = [];
+        if (["admin", "manager"].includes(req.user.role)) {
+            employeeAttendance = await EmployeeAttendance.find({ date: dateRange })
+                .populate("employeeId", "name phone role")
+                .populate("markedBy", "name")
+                .populate("approvedBy", "name");
+        }
 
         return res.status(200).json({
             message: "Today's attendance report",
             labourAttendance,
-            employeeAttendance
+            employeeAttendance,
         });
-
     } catch (error) {
         return res.status(500).json({ message: "Error fetching report", error: error.message });
     }
 };
 
-
 /* ======================================================
-   2️⃣ PROJECT SUMMARY REPORT (Counts + Status Summary)
+   2) PROJECT SUMMARY REPORT
    ====================================================== */
 export const getProjectSummaryReport = async (req, res) => {
     try {
         const { projectId } = req.params;
         const today = startOfDay();
 
-        const todayAttendance = await Attendance.find({
-            projectId,
-            date: today
-        }).populate("labourId", "name");
+        const [todayAttendance, totalLabours] = await Promise.all([
+            Attendance.find({ projectId, date: { $gte: today, $lt: nextDay(today) } }),
+            // Labour has no projectId field - assignment lives in assignedProjects
+            Labour.countDocuments({ assignedProjects: projectId, status: "Active" }),
+        ]);
 
-        const present = todayAttendance.filter(a => a.status === "Present").length;
-        const absent = todayAttendance.filter(a => a.status === "Absent").length;
-        const halfDay = todayAttendance.filter(a => a.status === "Half-Day").length;
+        const count = (fn) => todayAttendance.filter(fn).length;
 
-        const totalLabours = await Labour.countDocuments({ projectId });
+        const present = count((a) => a.status === "Present");
+        const absent = count((a) => a.status === "Absent");
+        const halfDay = count((a) => a.status === "Half-Day");
 
         return res.status(200).json({
             projectId,
@@ -72,19 +74,22 @@ export const getProjectSummaryReport = async (req, res) => {
                 totalLabours,
                 present,
                 absent,
-                halfDay
-            }
+                halfDay,
+                notMarked: Math.max(totalLabours - todayAttendance.length, 0),
+                punchedInOnly: count((a) => a.checkInTime && !a.checkOutTime && a.status !== "Absent"),
+                pendingApproval: count((a) => a.approvalStatus === "Pending"),
+                approved: count((a) => a.approvalStatus === "Approved"),
+                rejected: count((a) => a.approvalStatus === "Rejected"),
+                overtimeHours: todayAttendance.reduce((s, a) => s + (a.overtimeHours || 0), 0),
+            },
         });
-
     } catch (error) {
         return res.status(500).json({ message: "Summary error", error: error.message });
     }
 };
 
-
 /* ======================================================
-   3️⃣ MONTHLY ATTENDANCE REPORT
-   query ?month=12&year=2025
+   3) MONTHLY ATTENDANCE REPORT  ?month=12&year=2025
    ====================================================== */
 export const getMonthlyAttendanceReport = async (req, res) => {
     try {
@@ -95,31 +100,50 @@ export const getMonthlyAttendanceReport = async (req, res) => {
             return res.status(400).json({ message: "month & year are required" });
         }
 
-        const start = new Date(year, month - 1, 1);
-        const end = new Date(year, month, 0);
-
-        const startDate = startOfDay(start);
-        const endDate = new Date(end);
-        endDate.setHours(23, 59, 59, 999);
+        const startDate = new Date(Number(year), Number(month) - 1, 1);
+        const endDate = new Date(Number(year), Number(month), 1); // exclusive
 
         const records = await Attendance.find({
             projectId,
-            date: {
-                $gte: startDate,
-                $lte: endDate
-            }
+            date: { $gte: startDate, $lt: endDate },
         })
             .populate("labourId", "name phone skillLevel")
             .sort({ date: 1 });
+
+        // Per-labour totals (wages only from admin-approved records)
+        const perLabour = {};
+        for (const r of records) {
+            const key = String(r.labourId?._id || r.labourId);
+            const row = (perLabour[key] ||= {
+                labour: r.labourId,
+                present: 0,
+                halfDay: 0,
+                absent: 0,
+                overtimeHours: 0,
+                approvedOvertimeHours: 0,
+                approvedWages: 0,
+                pendingRecords: 0,
+            });
+
+            if (r.status === "Present") row.present++;
+            else if (r.status === "Half-Day") row.halfDay++;
+            else row.absent++;
+
+            row.overtimeHours += r.overtimeHours || 0;
+            row.approvedOvertimeHours += r.approvedOvertimeHours || 0;
+
+            if (r.approvalStatus === "Approved") row.approvedWages += r.dailyWageAmount || 0;
+            else row.pendingRecords++;
+        }
 
         return res.status(200).json({
             projectId,
             month,
             year,
             totalRecords: records.length,
-            records
+            summary: Object.values(perLabour),
+            records,
         });
-
     } catch (error) {
         return res.status(500).json({ message: "Monthly report error", error: error.message });
     }
