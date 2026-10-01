@@ -1,4 +1,5 @@
 import StockRequest from "../models/StockRequest.js";
+import MaterialRequest from "../models/MaterialRequest.js";
 import Item from "../models/Item.js";
 import { uploadToCloudinary } from "../utils/cloudUpload.js";
 import { success, fail, getPagination, buildPagination, getDateRangeFilter } from "../utils/apiResponse.js";
@@ -42,6 +43,31 @@ export const createStockRequest = async (req, res) => {
             attachments,
             createdBy: req.user.id,
         });
+
+        // Mirror to MaterialRequest collection for single-source-of-truth compatibility
+        try {
+            await MaterialRequest.create({
+                projectId,
+                requiredDate,
+                items: [
+                    {
+                        itemId: materialId,
+                        requestedQty: quantity,
+                        unit: unit || item.unit,
+                        priority: priority || "Medium",
+                        purpose: purpose || "",
+                    }
+                ],
+                requestedBy: req.user.id,
+                images,
+                attachments,
+                status: "pending",
+                stockRequestId: request._id,
+                requestNumber: request.requestNumber,
+            });
+        } catch (syncErr) {
+            console.warn("MaterialRequest sync note:", syncErr.message);
+        }
 
         await logAudit({ module: "StockRequest", entityId: request._id, action: "created", performedBy: req.user.id });
         await notifyRoles({ roles: ["admin"], title: "New stock request", message: `${item.name} x${quantity} requested`, module: "Stock", referenceType: "StockRequest", referenceId: request._id, projectId });
@@ -121,6 +147,18 @@ export const reviewStockRequest = async (req, res) => {
         request.status = map[decision];
         request.adminRemarks = adminRemarks || ""; request.reviewedBy=req.user.id; request.reviewedAt=new Date(); request.updatedBy=req.user.id;
         await request.save();
+
+        // Sync status to MaterialRequest
+        try {
+            const mrStatus = decision === "reject" ? "rejected" : "approved";
+            await MaterialRequest.updateMany(
+                { $or: [{ stockRequestId: request._id }, { requestNumber: request.requestNumber }, { projectId: request.projectId, "items.itemId": request.materialId, status: "pending" }] },
+                { $set: { status: mrStatus, approvedBy: req.user.id, approvalDate: new Date() } }
+            );
+        } catch (mrErr) {
+            console.warn("MaterialRequest status sync note:", mrErr.message);
+        }
+
         await logAudit({ module:"StockRequest", entityId:request._id, action:`review:${decision}`, performedBy:req.user.id, remarks:adminRemarks });
         await notifyUsers({ userIds:[request.requestedBy], title:`Stock request ${request.status}`, message:`Your request for ${request.materialName} was ${request.status.toLowerCase()}`, module:"Stock", referenceType:"StockRequest", referenceId:request._id, projectId:request.projectId });
         return success(res,200,"Stock request reviewed",request);

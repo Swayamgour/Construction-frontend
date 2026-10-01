@@ -82,6 +82,8 @@ import AuditLogPage from "./pages/reports/AuditLogPage";
 import StockOperations from "./pages/stock/StockOperations";
 import LabourDashboard from "./pages/labour/LabourDashboard";
 import LabourDetail from "./pages/labour/LabourDetail";
+import LabourReports from "./pages/labour/LabourReports";
+import UnassignedLabour from "./pages/labourManagement/UnassignedLabour";
 import StockItemHistory from "./pages/inventory/StockItemHistory";
 import LabourForm from "./pages/labour/LabourForm";
 import PMDashboard from "./pages/projectManager/PMDashboard";
@@ -1062,6 +1064,66 @@ function App() {
           </Layout>
         } />
 
+        <Route path="/labour/unassigned" element={
+          <Layout>
+            <UnassignedLabour />
+          </Layout>
+        } />
+
+        <Route path="/labour/details/:id" element={
+          <Layout>
+            <LabourDetail />
+          </Layout>
+        } />
+
+        <Route path="/labour" element={
+          <Layout>
+            <LabourDashboard />
+          </Layout>
+        } />
+
+        <Route path="/labours" element={
+          <Layout>
+            <LabourDashboard />
+          </Layout>
+        } />
+
+        <Route path="/labour/:id" element={
+          <Layout>
+            <LabourDetail />
+          </Layout>
+        } />
+
+        <Route path="/labours/:id" element={
+          <Layout>
+            <LabourDetail />
+          </Layout>
+        } />
+
+        <Route path="/labours/details/:id" element={
+          <Layout>
+            <LabourDetail />
+          </Layout>
+        } />
+
+        <Route path="/labour/reports" element={
+          <Layout>
+            <LabourReports />
+          </Layout>
+        } />
+
+        <Route path="/reports/labour" element={
+          <Layout>
+            <LabourReports />
+          </Layout>
+        } />
+
+        <Route path="/reports/workforce" element={
+          <Layout>
+            <LabourReports />
+          </Layout>
+        } />
+
         <Route path="/audit-log" element={
           <Layout>
             <AuditLogPage />
@@ -1072,11 +1134,7 @@ function App() {
 
 
 
-        {/* <Route path="/GanttPage" element={
-          <Layout>
-            <ProjectPage />
-          </Layout>
-        } /> */}
+
 
 
 

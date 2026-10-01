@@ -39,6 +39,7 @@ import notificationRoutes from "./routes/notificationRoutes.js";
 import auditRoutes from "./routes/auditRoutes.js";
 import erpReportRoutes from "./routes/erpReportRoutes.js";
 import purchaseOrderRoutes from "./routes/purchaseOrderRoutes.js";
+import { startAutoAbsentScheduler } from "./services/autoAbsentScheduler.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -200,4 +201,5 @@ app.listen(PORT, () => {
     console.log(`🌐 Server: http://localhost:${PORT}`);
     console.log(`📁 Uploads: http://localhost:${PORT}/uploads`);
     console.log("========================================");
+    startAutoAbsentScheduler();
 });

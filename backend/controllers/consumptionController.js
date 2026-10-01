@@ -47,25 +47,42 @@ export const addConsumptionMultiple = async (req, res) => {
 
             for (const it of items) {
                 const qty = Number(it.qtyUsed);
-                const { ledgerEntry } = await applyStockLedgerEntry({
-                    projectId,
-                    itemId: it.itemId,
-                    qtyChange: -qty,
-                    transactionType: "CONSUMPTION",
-                    referenceNumber: `CONS-${Date.now()}`,
-                    remarks: it.remarks || "Material consumed",
-                    session,
-                });
-                await logAudit({
-                    module: "Inventory",
-                    entityId: ledgerEntry._id,
-                    action: "consumption",
-                    performedBy: userId,
-                    remarks: it.remarks || "",
-                    meta: { projectId, itemId: it.itemId, qty },
-                    projectId,
-                    session,
-                });
+                const isIssued = Boolean(it.isAlreadyIssued);
+
+                if (!isIssued) {
+                    // Direct consumption: debits project inventory
+                    const { ledgerEntry } = await applyStockLedgerEntry({
+                        projectId,
+                        itemId: it.itemId,
+                        qtyChange: -qty,
+                        transactionType: "CONSUMPTION",
+                        referenceNumber: `CONS-${Date.now()}`,
+                        remarks: it.remarks || "Direct material consumption",
+                        session,
+                    });
+                    await logAudit({
+                        module: "Inventory",
+                        entityId: ledgerEntry._id,
+                        action: "consumption",
+                        performedBy: userId,
+                        remarks: it.remarks || "",
+                        meta: { projectId, itemId: it.itemId, qty },
+                        projectId,
+                        session,
+                    });
+                } else {
+                    // Consumption against previously issued material: record audit without double deducting
+                    await logAudit({
+                        module: "Inventory",
+                        entityId: saved[0]?._id,
+                        action: "consumption_from_issue",
+                        performedBy: userId,
+                        remarks: it.remarks || "Consumption from previously issued stock (no double deduction)",
+                        meta: { projectId, itemId: it.itemId, qty, isAlreadyIssued: true },
+                        projectId,
+                        session,
+                    });
+                }
             }
         });
 

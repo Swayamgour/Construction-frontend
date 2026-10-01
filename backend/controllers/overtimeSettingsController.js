@@ -16,7 +16,17 @@ export const getOvertimeSettings = async (req, res) => {
 /** PUT /api/labour/overtime-settings — admin/manager configures working hours. Upserts per-project or global (projectId omitted). */
 export const upsertOvertimeSettings = async (req, res) => {
     try {
-        const { projectId, workStartTime, workEndTime, standardWorkingHours, weeklyOvertimeThresholdHours, regularRate, overtimeMultiplier } = req.body;
+        const {
+            projectId,
+            workStartTime,
+            workEndTime,
+            standardWorkingHours,
+            weeklyOvertimeThresholdHours,
+            regularRate,
+            overtimeMultiplier,
+            attendanceCutoffTime,
+            autoAbsentEnabled,
+        } = req.body;
 
         const filter = { projectId: projectId || null };
         const update = {
@@ -26,6 +36,8 @@ export const upsertOvertimeSettings = async (req, res) => {
             ...(weeklyOvertimeThresholdHours !== undefined && { weeklyOvertimeThresholdHours }),
             ...(regularRate !== undefined && { regularRate }),
             ...(overtimeMultiplier !== undefined && { overtimeMultiplier }),
+            ...(attendanceCutoffTime && { attendanceCutoffTime }),
+            ...(autoAbsentEnabled !== undefined && { autoAbsentEnabled }),
             updatedBy: req.user.id,
         };
 
@@ -33,5 +45,21 @@ export const upsertOvertimeSettings = async (req, res) => {
         return success(res, 200, "Overtime settings saved", settings);
     } catch (error) {
         return fail(res, 500, "Error saving settings", error);
+    }
+};
+
+/** POST /api/labour/auto-absent/run — manual trigger for generating automatic absent records */
+export const triggerAutoAbsent = async (req, res) => {
+    try {
+        const { projectId, date } = req.body;
+        const { generateAutoAbsent } = await import("../services/autoAbsentService.js");
+        const result = await generateAutoAbsent({
+            projectId: projectId || null,
+            date: date || null,
+            executedBy: req.user.id,
+        });
+        return success(res, 200, `Auto-absent generated (${result.totalGenerated} records created)`, result);
+    } catch (error) {
+        return fail(res, 500, "Error running auto-absent", error);
     }
 };

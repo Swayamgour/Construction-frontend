@@ -67,7 +67,7 @@ router.get("/requests/:id", auth, roleCheck("admin", "manager", "supervisor", "s
 router.patch("/requests/:id/review", auth, roleCheck("admin"), checkProjectAccess(stockRequestProject), reviewStockRequest);
 
 // --- Stock Transfers (inter-project fulfilment) ---
-router.post("/transfers", auth, roleCheck("admin"), createStockTransfer);
+router.post("/transfers", auth, roleCheck("admin", "manager", "storekeeper"), createStockTransfer);
 router.get("/transfers", auth, roleCheck("admin", "manager", "storekeeper"), listStockTransfers);
 router.patch("/transfers/:id/receive", auth, roleCheck("admin", "manager", "supervisor"), checkProjectAccess(stockTransferProjects), confirmTransferReceipt);
 router.patch("/transfers/:id/cancel", auth, roleCheck("admin"), checkProjectAccess(stockTransferProjects), cancelStockTransfer);

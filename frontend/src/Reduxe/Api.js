@@ -279,6 +279,11 @@ export const Api = createApi({
             providesTags: ["LabourAssignment"],
         }),
 
+        getUnassignedLabours: build.query({
+            query: (params) => ({ url: "labour/unassigned", params }),
+            providesTags: ["Labour", "LabourAssignment"],
+        }),
+
         getLabourAssignmentHistory: build.query({
             query: (labourId) => `labour/${labourId}/history`,
             providesTags: ["LabourAssignment"],
@@ -330,6 +335,11 @@ export const Api = createApi({
         upsertOvertimeSettings: build.mutation({
             query: (body) => ({ url: "labour/overtime-settings", method: "PUT", body }),
             invalidatesTags: ["OvertimeSettings"],
+        }),
+
+        triggerAutoAbsent: build.mutation({
+            query: (body) => ({ url: "labour/auto-absent/run", method: "POST", body }),
+            invalidatesTags: ["LabourAttendance", "Reports"],
         }),
 
         /* =====================================================================
@@ -1103,12 +1113,24 @@ export const Api = createApi({
         }),
 
         todayReport: build.query({
-            query: (projectId) => `attendance/reports/today/${projectId}`,
+            query: (arg) => {
+                if (typeof arg === "object" && arg !== null) {
+                    const { projectId, date } = arg;
+                    return `attendance/reports/today/${projectId}${date ? `?date=${date}` : ""}`;
+                }
+                return `attendance/reports/today/${arg}`;
+            },
             providesTags: ["Reports"],
         }),
 
         summaryReport: build.query({
-            query: (projectId) => `attendance/reports/summary/${projectId}`,
+            query: (arg) => {
+                if (typeof arg === "object" && arg !== null) {
+                    const { projectId, date } = arg;
+                    return `attendance/reports/summary/${projectId}${date ? `?date=${date}` : ""}`;
+                }
+                return `attendance/reports/summary/${arg}`;
+            },
             providesTags: ["Reports"],
         }),
 
@@ -1355,6 +1377,7 @@ export const {
     useTransferLabourMutation,
     useReleaseLabourMutation,
     useGetLabourAssignmentsQuery,
+    useGetUnassignedLaboursQuery,
     useGetLabourAssignmentHistoryQuery,
     useGetProjectActiveLabourQuery,
     useGetLabourFullHistoryQuery,
@@ -1365,6 +1388,7 @@ export const {
     useCorrectOvertimeMutation,
     useGetOvertimeSettingsQuery,
     useUpsertOvertimeSettingsMutation,
+    useTriggerAutoAbsentMutation,
 
     useGetMaterialRequestQuery,
     useGetSingleMRQuery,

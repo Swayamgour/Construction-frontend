@@ -8,6 +8,7 @@ import {
     assignLabourToProject,
     transferLabour,
     releaseLabour,
+    getUnassignedLabours,
     getLabourAssignmentHistory,
     getLabourFullHistory,
     getProjectActiveLabour,
@@ -25,6 +26,7 @@ import {
 import {
     getOvertimeSettings,
     upsertOvertimeSettings,
+    triggerAutoAbsent,
 } from "../controllers/overtimeSettingsController.js";
 
 const router = express.Router();
@@ -38,6 +40,7 @@ const transferProjectIds = (req) => [req.body?.fromProjectId, req.body?.toProjec
 const attendanceProject = resolveProjectFrom(Attendance, { param: "id", field: "projectId" });
 
 /* --------------------------- ASSIGNMENT & TRANSFER --------------------- */
+router.get("/unassigned", auth, roleCheck("admin", "manager"), getUnassignedLabours);
 router.post("/assign", auth, roleCheck("admin", "manager", "supervisor"), checkProjectAccess(), assignLabourToProject);
 router.post("/transfer", auth, roleCheck("admin", "manager"), checkProjectAccess(transferProjectIds), transferLabour);
 router.post("/release", auth, roleCheck("admin", "manager", "supervisor"), checkProjectAccess(), releaseLabour);
@@ -56,5 +59,6 @@ router.patch("/overtime/:id/correct", auth, roleCheck("admin", "manager", "super
 /* --------------------------- CONFIGURABLE WORKING HOURS ------------------ */
 router.get("/overtime-settings", auth, roleCheck("admin", "manager"), getOvertimeSettings);
 router.put("/overtime-settings", auth, roleCheck("admin", "manager"), upsertOvertimeSettings);
+router.post("/auto-absent/run", auth, roleCheck("admin", "manager"), triggerAutoAbsent);
 
 export default router;

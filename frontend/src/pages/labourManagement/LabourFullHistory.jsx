@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { History, ArrowRightLeft, Clock, CalendarCheck, FolderKanban, Phone, Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { History, ArrowRightLeft, Clock, CalendarCheck, FolderKanban, Phone, Loader2, ExternalLink } from "lucide-react";
 import { useGetLabourQuery, useGetLabourFullHistoryQuery } from "../../Reduxe/Api";
 import { getInitials, getAvatarGradient } from "../../helper/avatar";
 
@@ -79,6 +80,15 @@ export default function LabourFullHistory() {
                 {result.labour?.skillLevel && <span>· {result.labour.skillLevel}</span>}
               </p>
             </div>
+            {result.labour?._id && (
+              <Link
+                to={`/LabourDetail/${result.labour._id}`}
+                className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-200 transition-colors shadow-sm"
+              >
+                <span>View Full Profile</span>
+                <ExternalLink size={14} />
+              </Link>
+            )}
           </div>
 
           <Section title="Assignments" icon={ArrowRightLeft} count={result.assignments?.length}>

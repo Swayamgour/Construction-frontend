@@ -58,12 +58,20 @@ const labourSchema = new mongoose.Schema({
     accountNumber: { type: String },
     ifscCode: { type: String },
     joinDate: { type: Date },
+    joiningDate: { type: Date },
+
+    fatherName: { type: String, default: "" },
+    alternatePhone: { type: String, default: "" },
+    profilePhoto: { type: String, default: "" },
+    notes: { type: String, default: "" },
+    skills: [{ type: String }],
 
     contractorName: { type: String },
 
     emergencyContact: {
         name: String,
-        phone: String
+        phone: String,
+        relationship: String
     },
 
     documents: {

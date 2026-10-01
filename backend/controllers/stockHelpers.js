@@ -1,27 +1,17 @@
-import Stock from "../models/Stock.js";
+import { applyStockMovement } from "../services/inventoryService.js";
 
-export const adjustStock = async ({ projectId, itemId, unit, qtyChange }) => {
-  // qtyChange +ve -> IN, -ve -> OUT
-  let stock = await Stock.findOne({ projectId, itemId });
-
-  if (!stock) {
-    stock = await Stock.create({
-      projectId,
-      itemId,
-      qty: 0,
-      unit,
-    });
-  }
-
-  const newQty = stock.qty + qtyChange;
-
-  if (newQty < 0) {
-    throw new Error("Insufficient stock");
-  }
-
-  stock.qty = newQty;
-  if (unit && !stock.unit) stock.unit = unit;
-
-  await stock.save();
-  return stock;
+/**
+ * Legacy helper maintained for backward compatibility.
+ * Safely redirects through central inventoryService.
+ */
+export const adjustStock = async ({ projectId, itemId, unit, qtyChange, session = null }) => {
+  const result = await applyStockMovement({
+    projectId,
+    itemId,
+    qtyChange,
+    transactionType: qtyChange > 0 ? "GRN" : "OUT",
+    remarks: "Legacy stock adjustment",
+    session,
+  });
+  return result.stock;
 };

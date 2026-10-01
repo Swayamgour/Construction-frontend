@@ -24,9 +24,12 @@ const labourAssignmentSchema = new mongoose.Schema(
 
         assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
         transferredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+        releasedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
 
         transferReason: { type: String, default: "" },
+        releaseReason: { type: String, default: "" },
         remarks: { type: String, default: "" },
+        notes: { type: String, default: "" },
 
         status: {
             type: String,

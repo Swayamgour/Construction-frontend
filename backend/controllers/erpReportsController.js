@@ -20,7 +20,7 @@ export const labourOvertimeReport = async (req, res) => {
         Object.assign(filter, getDateRangeFilter(req, "date"));
 
         const [items, total, agg] = await Promise.all([
-            Attendance.find(filter).populate("labourId", "name").populate("projectId", "projectName").sort({ date: -1 }).skip(skip).limit(limit),
+            Attendance.find(filter).populate("labourId", "name phone category labourType dailyWage").populate("projectId", "projectName").sort({ date: -1 }).skip(skip).limit(limit),
             Attendance.countDocuments(filter),
             Attendance.aggregate([
                 { $match: filter },

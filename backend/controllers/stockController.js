@@ -5,6 +5,7 @@ import StockIssue from "../models/StockIssue.js";
 import StockTransaction from "../models/StockTransaction.js";
 import { applyStockLedgerEntry } from "../utils/inventory.js";
 import { logAudit } from "../utils/audit.js";
+import { getOrCreateCentralGodown } from "../services/inventoryService.js";
 
 // ⚠️ NOTE ON A BUG FOUND & FIXED HERE (follow-up audit):
 // controllers/stockHelpers.js's adjustStock() queried
@@ -193,11 +194,17 @@ export const transferMaterial = async (req, res) => {
 export const returnMaterial = async (req, res) => {
   const session = await mongoose.startSession();
   try {
-    const { projectId, itemId, qty, unit, reason } = req.body;
+    const { projectId, toProjectId, destinationProjectId, itemId, qty, unit, reason } = req.body;
     const n = Number(qty);
 
     if (!projectId || !itemId || !Number.isFinite(n) || n <= 0) {
       return res.status(400).json({ message: "projectId, itemId and a positive qty are required" });
+    }
+
+    let destId = toProjectId || destinationProjectId;
+    if (!destId) {
+      const godown = await getOrCreateCentralGodown(session);
+      destId = godown._id;
     }
 
     let stock, txn;
@@ -207,19 +214,25 @@ export const returnMaterial = async (req, res) => {
         remarks: reason || "Material returned", session,
       }));
 
+      await applyStockLedgerEntry({
+        projectId: destId, itemId, qtyChange: n, transactionType: "RECEIPT",
+        remarks: `Returned material received from ${projectId}: ${reason || "Return from site"}`, session,
+      });
+
       [txn] = await StockTransaction.create([{
         projectId, itemId, type: "RETURN", qty: n, unit,
+        toProject: destId,
         reason: reason || "Material returned", createdBy: req.user.id,
       }], { session });
 
       await logAudit({
         module: "Inventory", entityId: txn._id, action: "return",
-        performedBy: req.user.id, meta: { projectId, itemId, qty: n }, projectId, session,
+        performedBy: req.user.id, meta: { projectId, toProjectId: destId, itemId, qty: n }, projectId, session,
       });
     });
 
     return res.status(201).json({
-      message: "Material returned",
+      message: "Material returned and credited to central godown/store",
       stock,
       transaction: txn,
     });
@@ -273,21 +286,24 @@ export const getProjectStock = async (req, res) => {
   try {
     const { projectId } = req.params;
 
-    const allStock = await Stock.find().populate("itemId", "name unit");
+    const allStock = await Stock.find().populate("itemId", "name unit category");
 
-    const filtered = allStock.map((st) => {
-      const pb = st.projectBalances.find(
-        (p) => String(p.projectId) === String(projectId)
-      );
+    const filtered = allStock
+      .filter((st) => st.itemId)
+      .map((st) => {
+        const pb = st.projectBalances.find(
+          (p) => String(p.projectId) === String(projectId)
+        );
 
-      return {
-        itemId: st.itemId._id,
-        name: st.itemId.name,
-        unit: st.itemId.unit,
-        qty: pb?.qty || 0,
-        damaged: st.damaged,
-      };
-    });
+        return {
+          itemId: st.itemId._id,
+          name: st.itemId.name,
+          category: st.itemId.category,
+          unit: st.itemId.unit,
+          qty: pb?.qty || 0,
+          damaged: st.damaged || 0,
+        };
+      });
 
     res.status(200).json({ stock: filtered });
 

@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Settings, Save, Building2 } from "lucide-react";
+import { Settings, Save, Building2, Play, Clock, CheckCircle } from "lucide-react";
 import {
     useGetOvertimeSettingsQuery,
     useUpsertOvertimeSettingsMutation,
+    useTriggerAutoAbsentMutation,
     useGetProjectsQuery,
 } from "../../Reduxe/Api";
 
@@ -23,6 +24,8 @@ const DEFAULTS = {
     weeklyOvertimeThresholdHours: 48,
     regularRate: 0,
     overtimeMultiplier: 1.5,
+    attendanceCutoffTime: "20:00",
+    autoAbsentEnabled: true,
 };
 
 export default function OvertimeSettings() {
@@ -33,6 +36,7 @@ export default function OvertimeSettings() {
 
     const { data, isLoading, isFetching } = useGetOvertimeSettingsQuery(scopeProjectId || undefined);
     const [upsertOvertimeSettings, { isLoading: isSaving }] = useUpsertOvertimeSettingsMutation();
+    const [triggerAutoAbsent, { isLoading: isTriggering }] = useTriggerAutoAbsentMutation();
 
     const [form, setForm] = useState(DEFAULTS);
 
@@ -45,6 +49,8 @@ export default function OvertimeSettings() {
             weeklyOvertimeThresholdHours: settings?.weeklyOvertimeThresholdHours ?? DEFAULTS.weeklyOvertimeThresholdHours,
             regularRate: settings?.regularRate ?? DEFAULTS.regularRate,
             overtimeMultiplier: settings?.overtimeMultiplier ?? DEFAULTS.overtimeMultiplier,
+            attendanceCutoffTime: settings?.attendanceCutoffTime ?? DEFAULTS.attendanceCutoffTime,
+            autoAbsentEnabled: settings?.autoAbsentEnabled ?? DEFAULTS.autoAbsentEnabled,
         });
     }, [data]);
 
@@ -59,12 +65,23 @@ export default function OvertimeSettings() {
                 weeklyOvertimeThresholdHours: Number(form.weeklyOvertimeThresholdHours),
                 regularRate: Number(form.regularRate),
                 overtimeMultiplier: Number(form.overtimeMultiplier),
+                attendanceCutoffTime: form.attendanceCutoffTime || "20:00",
+                autoAbsentEnabled: Boolean(form.autoAbsentEnabled),
             }).unwrap();
             toast.success(
                 scopeProjectId ? "Project overtime settings saved" : "Company-wide default settings saved"
             );
         } catch (err) {
             toast.error(err?.data?.message || "Failed to save settings");
+        }
+    };
+
+    const handleManualAutoAbsent = async () => {
+        try {
+            const res = await triggerAutoAbsent({ projectId: scopeProjectId || null, force: true }).unwrap();
+            toast.success(res?.message || `Auto-absent generated: ${res?.data?.createdCount || 0} marked absent`);
+        } catch (err) {
+            toast.error(err?.data?.message || "Failed to trigger auto-absent");
         }
     };
 
@@ -169,13 +186,49 @@ export default function OvertimeSettings() {
                             />
                             <p className="text-xs text-gray-400 mt-1">OT rate = Regular Rate × this.</p>
                         </div>
+                        <div>
+                            <label className="text-sm font-medium text-gray-600">Attendance Cutoff Time</label>
+                            <input
+                                type="time"
+                                value={form.attendanceCutoffTime}
+                                onChange={(e) => setForm({ ...form, attendanceCutoffTime: e.target.value })}
+                                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                            <p className="text-xs text-gray-400 mt-1">Active workers with no attendance after this time will be marked Absent.</p>
+                        </div>
+                        <div className="flex items-center gap-3 pt-6">
+                            <input
+                                type="checkbox"
+                                id="autoAbsentEnabled"
+                                checked={form.autoAbsentEnabled}
+                                onChange={(e) => setForm({ ...form, autoAbsentEnabled: e.target.checked })}
+                                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                            />
+                            <label htmlFor="autoAbsentEnabled" className="text-sm font-medium text-gray-700 cursor-pointer">
+                                Enable Automatic Absent Generation
+                            </label>
+                        </div>
                     </div>
-                    <button
-                        disabled={isSaving}
-                        className="inline-flex items-center gap-2 bg-blue-900 hover:bg-blue-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition disabled:opacity-60"
-                    >
-                        <Save size={16} /> {isSaving ? "Saving..." : "Save Settings"}
-                    </button>
+
+                    <div className="pt-4 border-t border-gray-100 flex flex-wrap items-center justify-between gap-4">
+                        <button
+                            disabled={isSaving}
+                            type="submit"
+                            className="inline-flex items-center gap-2 bg-blue-900 hover:bg-blue-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition disabled:opacity-60 shadow-sm"
+                        >
+                            <Save size={16} /> {isSaving ? "Saving..." : "Save Settings"}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleManualAutoAbsent}
+                            disabled={isTriggering}
+                            className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 px-4 py-2.5 rounded-lg text-sm font-medium transition disabled:opacity-60 border border-slate-200"
+                        >
+                            <Play size={15} className="text-emerald-600 fill-emerald-600" />
+                            {isTriggering ? "Running Auto-Absent..." : "Run Auto-Absent Now"}
+                        </button>
+                    </div>
                 </form>
             )}
         </div>

@@ -5,7 +5,8 @@ import {
   LayoutDashboard, UserPlus, Layers, Store, ClipboardList, Users,
   Factory, BarChart2, Boxes, ChevronDown, ArrowRightLeft,
   Clock, FileStack, Truck, CalendarCheck, AlertTriangle,
-  PanelLeftClose, PanelLeftOpen, LogOut, X, History, ShieldCheck,
+  PanelLeftClose, PanelLeftOpen, LogOut, X, History, ShieldCheck, UserX,
+  ClipboardCheck,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { APP_NAME } from "../config/brand";
@@ -27,18 +28,20 @@ const NAV_GROUPS = [
     label: "Labour",
     items: [
       { name: "Labour Manage", icon: Users, path: "/LabourDashboard", roles: ["admin", "manager", "supervisor"] },
-      { name: "Assign Labour", icon: Users, path: "/AssignLabour", roles: ["manager", "supervisor"] },
+      { name: "Unassigned Labour", icon: UserX, path: "/labour/unassigned", roles: ["admin", "manager"] },
+      { name: "Assign Labour", icon: Users, path: "/AssignLabour", roles: ["admin", "manager"] },
 
       { name: "Attendance / Workforce", icon: ClipboardList, path: "/attendance/workforce", roles: ["admin"] },
       { name: "Attendance Labour", icon: ClipboardList, path: "/AttendanceLabour", roles: ["manager", "supervisor"] },
+      { name: "Attendance Approvals", icon: ClipboardCheck, path: "/labour/pending", roles: ["admin", "manager"] },
 
-
-      { name: "Labour Transfer", icon: ArrowRightLeft, path: "/labour/transfer", roles: ["manager", "supervisor"] },
+      { name: "Labour Transfer", icon: ArrowRightLeft, path: "/labour/transfer", roles: ["admin", "manager"] },
       // { name: "Labour Transfer History", icon: History, path: "/labour/full-history", roles: ["admin"] },
       { name: "Overtime Requests", icon: Clock, path: "/labour/overtime", roles: ["admin"] },
       { name: "Labour Overtime", icon: Clock, path: "/labour/overtime", roles: ["manager", "supervisor"] },
       { name: "Project Active Labour", icon: Users, path: "/labour/project-active", roles: ["admin", "manager", "supervisor"] },
       { name: "Labour Full History", icon: History, path: "/labour/full-history", roles: ["admin", "manager", "supervisor"] },
+      { name: "Labour Reports", icon: BarChart2, path: "/labour/reports", roles: ["admin", "manager", "supervisor"] },
       { name: "Overtime Settings", icon: Clock, path: "/labour/overtime-settings", roles: ["admin", "manager"] },
     ],
   },
@@ -50,14 +53,16 @@ const NAV_GROUPS = [
 
   },
   {
-    label: "Materials & Stock",
+    label: "Materials & Inventory",
     items: [
-      { name: "Stock Overview", icon: Boxes, path: "/StockOverView", roles: ["supervisor", "admin", "manager"] },
-      { name: "Stock Manage", icon: Boxes, path: "/StockPage", roles: ["supervisor", "manager"] },
-      { name: "Material Approval", icon: BarChart2, path: "/MaterialApproval", roles: ["admin", "manager"] },
-      { name: "Stock Requests", icon: Boxes, path: "/stock/requests", roles: ["admin", "manager", "supervisor", "storekeeper"] },
-      { name: "Procurement", icon: Store, path: "/procurement", roles: ["manager", "storekeeper"] },
-      { name: "Stock Operations", icon: ArrowRightLeft, path: "/stock/operations", roles: ["manager", "storekeeper"] },
+      { name: "Material Approvals", icon: ClipboardList, path: "/stock/requests", roles: ["admin"] },
+      { name: "Material Requests", icon: ClipboardList, path: "/stock/requests", roles: ["manager", "storekeeper"] },
+      { name: "Site Requests", icon: ClipboardList, path: "/stock/requests", roles: ["supervisor"] },
+      { name: "Purchase Orders", icon: Store, path: "/purchase-orders", roles: ["admin", "manager", "storekeeper"] },
+      { name: "Goods Receipts (GRN)", icon: Boxes, path: "/stock/operations?tab=receipts", roles: ["admin", "manager", "storekeeper"] },
+      { name: "Inventory & Ledger", icon: Boxes, path: "/stock/operations", roles: ["admin", "manager", "storekeeper"] },
+      { name: "Site Inventory", icon: Boxes, path: "/stock/operations", roles: ["supervisor"] },
+      { name: "Stock Consumption", icon: ArrowRightLeft, path: "/consumption", roles: ["manager", "supervisor"] },
     ],
   },
   {

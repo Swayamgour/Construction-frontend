@@ -1,6 +1,7 @@
 import Attendance from "../models/Attendance.js";
 import EmployeeAttendance from "../models/EmployeeAttendance.js";
 import Labour from "../models/Labour.js";
+import LabourAssignment from "../models/LabourAssignment.js";
 
 const startOfDay = (d = new Date()) => {
     const dt = new Date(d);
@@ -15,16 +16,18 @@ const nextDay = (d) => {
 };
 
 /* ======================================================
-   1) TODAY ATTENDANCE REPORT (Labour + Employee)
+   1) TODAY / DAILY ATTENDANCE REPORT (Labour + Employee)
    ====================================================== */
 export const getTodayAttendanceReport = async (req, res) => {
     try {
         const { projectId } = req.params;
-        const today = startOfDay();
-        const dateRange = { $gte: today, $lt: nextDay(today) };
+        const selectedDate = req.query.date ? new Date(req.query.date) : new Date();
+        const targetDay = startOfDay(selectedDate);
+        const dateRange = { $gte: targetDay, $lt: nextDay(targetDay) };
 
         const labourAttendance = await Attendance.find({ projectId, date: dateRange })
-            .populate("labourId", "name phone skillLevel")
+            .populate("labourId", "name phone skillLevel category labourType dailyWage fatherName")
+            .populate("assignmentId", "assignmentDate releaseDate status")
             .populate("markedBy", "name")
             .populate("approvedBy", "name");
 
@@ -38,7 +41,8 @@ export const getTodayAttendanceReport = async (req, res) => {
         }
 
         return res.status(200).json({
-            message: "Today's attendance report",
+            message: "Daily attendance report",
+            date: targetDay,
             labourAttendance,
             employeeAttendance,
         });
@@ -53,15 +57,17 @@ export const getTodayAttendanceReport = async (req, res) => {
 export const getProjectSummaryReport = async (req, res) => {
     try {
         const { projectId } = req.params;
-        const today = startOfDay();
+        const selectedDate = req.query.date ? new Date(req.query.date) : new Date();
+        const targetDay = startOfDay(selectedDate);
 
-        const [todayAttendance, totalLabours] = await Promise.all([
-            Attendance.find({ projectId, date: { $gte: today, $lt: nextDay(today) } }),
-            // Labour has no projectId field - assignment lives in assignedProjects
+        const [dayAttendance, assignmentCount, legacyCount] = await Promise.all([
+            Attendance.find({ projectId, date: { $gte: targetDay, $lt: nextDay(targetDay) } }),
+            LabourAssignment.countDocuments({ projectId, status: "Active" }),
             Labour.countDocuments({ assignedProjects: projectId, status: "Active" }),
         ]);
 
-        const count = (fn) => todayAttendance.filter(fn).length;
+        const totalLabours = Math.max(assignmentCount, legacyCount);
+        const count = (fn) => dayAttendance.filter(fn).length;
 
         const present = count((a) => a.status === "Present");
         const absent = count((a) => a.status === "Absent");
@@ -69,18 +75,19 @@ export const getProjectSummaryReport = async (req, res) => {
 
         return res.status(200).json({
             projectId,
-            date: today,
+            date: targetDay,
             summary: {
                 totalLabours,
                 present,
                 absent,
                 halfDay,
-                notMarked: Math.max(totalLabours - todayAttendance.length, 0),
+                notMarked: Math.max(totalLabours - dayAttendance.length, 0),
                 punchedInOnly: count((a) => a.checkInTime && !a.checkOutTime && a.status !== "Absent"),
                 pendingApproval: count((a) => a.approvalStatus === "Pending"),
                 approved: count((a) => a.approvalStatus === "Approved"),
                 rejected: count((a) => a.approvalStatus === "Rejected"),
-                overtimeHours: todayAttendance.reduce((s, a) => s + (a.overtimeHours || 0), 0),
+                overtimeHours: dayAttendance.reduce((s, a) => s + (a.overtimeHours || 0), 0),
+                totalLabourCost: dayAttendance.reduce((s, a) => s + (a.dailyWageAmount || a.totalAmount || 0), 0),
             },
         });
     } catch (error) {

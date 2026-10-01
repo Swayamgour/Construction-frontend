@@ -15,6 +15,8 @@ export const getEffectiveOvertimeSettings = async (projectId) => {
             standardWorkingHours: 9,
             regularRate: 0,
             overtimeMultiplier: 1.5,
+            attendanceCutoffTime: "20:00",
+            autoAbsentEnabled: true,
         }
     );
 };

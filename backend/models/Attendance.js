@@ -20,13 +20,26 @@ const attendanceSchema = new mongoose.Schema(
             required: true,
         },
 
+        assignmentId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "LabourAssignment",
+            default: null,
+            index: true,
+        },
+
         // Always stored as start-of-day
         date: { type: Date, default: todayStart },
 
         status: {
             type: String,
-            enum: ["Present", "Absent", "Half-Day"],
+            enum: ["Present", "Absent", "Half-Day", "Holiday", "Week-Off", "Leave"],
             required: true,
+        },
+
+        markedSource: {
+            type: String,
+            enum: ["MANUAL", "SYSTEM", "PUNCH", "BULK"],
+            default: "MANUAL",
         },
 
         shift: {
@@ -104,6 +117,8 @@ const attendanceSchema = new mongoose.Schema(
 // One record per labour / project / day (also stops duplicate records from
 // double clicks or parallel requests).
 attendanceSchema.index({ projectId: 1, labourId: 1, date: 1 }, { unique: true });
+attendanceSchema.index({ labourId: 1, assignmentId: 1, date: 1 });
+attendanceSchema.index({ assignmentId: 1, date: -1 });
 attendanceSchema.index({ projectId: 1, date: -1 });
 attendanceSchema.index({ approvalStatus: 1, projectId: 1 });
 

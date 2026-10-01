@@ -162,7 +162,7 @@ export const transferLabour = async (req, res) => {
  */
 export const releaseLabour = async (req, res) => {
     try {
-        const { labourId, releaseDate, remarks } = req.body;
+        const { labourId, releaseDate, releaseReason, remarks, notes } = req.body;
         if (!labourId) return fail(res, 400, "labourId is required");
 
         const currentAssignment = await LabourAssignment.findOne({ labourId, status: "Active" });
@@ -170,17 +170,56 @@ export const releaseLabour = async (req, res) => {
 
         currentAssignment.status = "Released";
         currentAssignment.releaseDate = releaseDate ? new Date(releaseDate) : new Date();
+        currentAssignment.releasedBy = req.user.id;
+        currentAssignment.releaseReason = releaseReason || remarks || "";
         if (remarks) currentAssignment.remarks = remarks;
+        if (notes) currentAssignment.notes = notes;
         await currentAssignment.save();
 
         await Labour.updateOne({ _id: labourId }, { $pull: { assignedProjects: currentAssignment.projectId } });
         await Project.updateOne({ _id: currentAssignment.projectId }, { $pull: { labours: labourId } });
 
-        await logAudit({ module: "LabourAssignment", entityId: currentAssignment._id, action: "released", performedBy: req.user.id });
+        await logAudit({ module: "LabourAssignment", entityId: currentAssignment._id, action: "released", performedBy: req.user.id, meta: { releaseReason: currentAssignment.releaseReason } });
 
         return success(res, 200, "Labour released", currentAssignment);
     } catch (error) {
         return fail(res, 500, "Error releasing labour", error);
+    }
+};
+
+/**
+ * GET /api/labour/unassigned
+ * Returns active workers who are not actively assigned to any project.
+ */
+export const getUnassignedLabours = async (req, res) => {
+    try {
+        const { page, limit, skip } = getPagination(req);
+        const { search, category, labourType } = req.query;
+
+        // Active assignments define workers currently assigned
+        const activeAssignments = await LabourAssignment.find({ status: "Active" }).select("labourId");
+        const assignedLabourIds = activeAssignments.map((a) => a.labourId);
+
+        const filter = {
+            _id: { $nin: assignedLabourIds },
+            status: "Active",
+        };
+
+        if (category) filter.category = category;
+        if (labourType) filter.labourType = labourType;
+        if (search && search.trim()) {
+            const regex = new RegExp(search.trim(), "i");
+            filter.$or = [{ name: regex }, { phone: regex }, { aadhaarNumber: regex }];
+        }
+
+        const [labours, total] = await Promise.all([
+            Labour.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+            Labour.countDocuments(filter),
+        ]);
+
+        return success(res, 200, "Unassigned labours fetched", labours, buildPagination(page, limit, total));
+    } catch (error) {
+        return fail(res, 500, "Error fetching unassigned labours", error);
     }
 };
 
@@ -214,41 +253,88 @@ export const getLabourFullHistory = async (req, res) => {
         const labour = await Labour.findById(labourId).populate("assignedProjects", "projectName projectCode");
         if (!labour) return fail(res, 404, "Labour not found");
 
-        const [allAssignments, attendance] = await Promise.all([
+        const [allAssignments, attendance, activities] = await Promise.all([
             LabourAssignment.find({ labourId })
                 .populate("projectId", "projectName projectCode")
                 .populate("previousProjectId", "projectName projectCode")
                 .populate("assignedBy", "name role")
                 .populate("transferredBy", "name role")
+                .populate("releasedBy", "name role")
                 .sort({ assignmentDate: -1 }),
             Attendance.find({ labourId })
                 .populate("projectId", "projectName projectCode")
+                .populate("markedBy", "name role")
+                .populate("approvedBy", "name role")
+                .populate("assignmentId")
                 .sort({ date: -1 }),
+            mongoose.model("AuditLog").find({
+                $or: [
+                    { entityId: labourId },
+                    { "meta.labourId": String(labourId) },
+                    { "meta.labourId": new mongoose.Types.ObjectId(labourId) }
+                ]
+            })
+                .populate("performedBy", "name role")
+                .sort({ timestamp: -1 })
+                .limit(50)
+                .catch(() => []),
         ]);
 
-        // "assignments" = every assignment record (the full timeline);
-        // "transfers" = the subset of that timeline that a transfer
-        // touched — both the record it closed (status "Transferred") and
-        // the record it opened (transferredBy set) — so a transfer shows
-        // up as a matched pair rather than being lost inside a flat list.
         const transfers = allAssignments.filter(
             (a) => a.status === "Transferred" || a.transferredBy
         );
 
-        // "overtime" = the attendance records that actually carry an
-        // overtime component, pulled from the same Attendance collection
-        // (overtime isn't a separate model in this schema — it's fields
-        // on each attendance record).
         const overtime = attendance.filter(
             (a) => (a.overtimeHours && a.overtimeHours > 0) || a.overtimeApprovalStatus
         );
 
+        const currentAssignment = allAssignments.find((a) => a.status === "Active") || null;
+
+        let totalWorkingDays = 0;
+        let presentDays = 0;
+        let absentDays = 0;
+        let halfDays = 0;
+        let totalHours = 0;
+        let totalOvertimeHours = 0;
+        let totalEarnings = 0;
+
+        for (const att of attendance) {
+            if (att.status === "Present") {
+                presentDays++;
+                totalWorkingDays++;
+            } else if (att.status === "Half-Day") {
+                halfDays++;
+                totalWorkingDays += 0.5;
+            } else if (att.status === "Absent") {
+                absentDays++;
+            }
+
+            totalHours += (att.totalWorkingHours || att.regularWorkingHours || 0);
+            totalOvertimeHours += (att.overtimeHours || 0);
+
+            if (att.approvalStatus === "Approved") {
+                totalEarnings += (att.dailyWageAmount || att.totalAmount || 0);
+            }
+        }
+
         return success(res, 200, "Labour full history fetched", {
             labour,
+            currentAssignment,
             assignments: allAssignments,
             transfers,
             attendance,
             overtime,
+            activities,
+            summary: {
+                totalWorkingDays: Math.round(totalWorkingDays * 10) / 10,
+                presentDays,
+                absentDays,
+                halfDays,
+                totalHours: Math.round(totalHours * 100) / 100,
+                overtimeHours: Math.round(totalOvertimeHours * 100) / 100,
+                totalEarnings: Math.round(totalEarnings * 100) / 100,
+                totalRecords: attendance.length,
+            },
         });
     } catch (error) {
         return fail(res, 500, "Error fetching labour full history", error);
@@ -263,14 +349,38 @@ export const getProjectActiveLabour = async (req, res) => {
 
         const [assignments, total] = await Promise.all([
             LabourAssignment.find(filter)
-                .populate({ path: "labourId", select: "name phone labourType category skillLevel status" })
+                .populate({ path: "labourId", select: "name phone labourType category skillLevel status profilePhoto dailyWage" })
                 .sort({ assignmentDate: -1 })
                 .skip(skip)
                 .limit(limit),
             LabourAssignment.countDocuments(filter),
         ]);
 
-        return success(res, 200, "Project labour fetched", assignments, buildPagination(page, limit, total));
+        const labourIds = assignments.map((a) => a.labourId?._id || a.labourId).filter(Boolean);
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const todayAttendances = await Attendance.find({
+            projectId: req.params.projectId,
+            labourId: { $in: labourIds },
+            date: { $gte: startOfDay, $lte: endOfDay },
+        }).select("labourId status punchIn punchOut regularWorkingHours totalWorkingHours overtimeHours approvalStatus");
+
+        const attMap = {};
+        for (const att of todayAttendances) {
+            attMap[String(att.labourId)] = att;
+        }
+
+        const enhancedAssignments = assignments.map((a) => {
+            const obj = a.toObject();
+            const lid = String(a.labourId?._id || a.labourId);
+            obj.todayAttendance = attMap[lid] || null;
+            return obj;
+        });
+
+        return success(res, 200, "Project labour fetched", enhancedAssignments, buildPagination(page, limit, total));
     } catch (error) {
         return fail(res, 500, "Error fetching project labour", error);
     }

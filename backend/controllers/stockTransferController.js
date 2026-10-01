@@ -15,34 +15,47 @@ import { notifyRoles, notifyUsers } from "../utils/notify.js";
 export const createStockTransfer = async (req, res) => {
     const session = await mongoose.startSession();
     try {
-        const { stockRequestId, sourceProjectId, quantity, remarks } = req.body;
-        if (!stockRequestId || !sourceProjectId || !quantity) {
-            return fail(res, 400, "stockRequestId, sourceProjectId and quantity are required");
+        const { stockRequestId, sourceProjectId, destinationProjectId, materialId, quantity, transferredQuantity, remarks } = req.body;
+        const qty = Number(transferredQuantity || quantity);
+
+        if (!sourceProjectId || !qty || qty <= 0) {
+            return fail(res, 400, "sourceProjectId and a positive quantity are required");
         }
 
-        const request = await StockRequest.findById(stockRequestId);
-        if (!request) return fail(res, 404, "Stock request not found");
-        if (!["PENDING_ADMIN_REVIEW", "PARTIALLY_FULFILLED"].includes(request.status)) {
-            return fail(res, 400, `Request is already ${request.status}`);
+        let targetDestId = destinationProjectId;
+        let targetMatId = materialId;
+        let request = null;
+
+        if (stockRequestId) {
+            request = await StockRequest.findById(stockRequestId);
+            if (!request) return fail(res, 404, "Stock request not found");
+            if (!["PENDING_ADMIN_REVIEW", "PARTIALLY_FULFILLED"].includes(request.status)) {
+                return fail(res, 400, `Request is already ${request.status}`);
+            }
+            targetDestId = request.projectId;
+            targetMatId = request.materialId;
         }
-        if (String(sourceProjectId) === String(request.projectId)) {
-            return fail(res, 400, "Source project cannot be the same as the requesting project");
+
+        if (!targetDestId || !targetMatId) {
+            return fail(res, 400, "destinationProjectId and materialId are required");
+        }
+
+        if (String(sourceProjectId) === String(targetDestId)) {
+            return fail(res, 400, "Source project cannot be the same as the destination project");
         }
 
         let transfer;
         await session.withTransaction(async () => {
-            // Create the transfer record first (gives us an id to reference
-            // from both ledger rows) before touching any balances.
             transfer = (
                 await StockTransfer.create(
                     [
                         {
-                            stockRequestId,
+                            stockRequestId: stockRequestId || null,
                             sourceProjectId,
-                            destinationProjectId: request.projectId,
-                            materialId: request.materialId,
-                            requestedQuantity: request.quantity,
-                            transferredQuantity: quantity,
+                            destinationProjectId: targetDestId,
+                            materialId: targetMatId,
+                            requestedQuantity: request ? request.quantity : qty,
+                            transferredQuantity: qty,
                             initiatedBy: req.user.id,
                             approvedBy: req.user.id,
                             status: "InTransit",
@@ -53,27 +66,27 @@ export const createStockTransfer = async (req, res) => {
                 )
             )[0];
 
-            // Debit source project first — if it fails (insufficient stock),
-            // the transaction aborts before the destination is ever touched.
+            const refNumber = request ? request.requestNumber : `TRF-${Date.now()}`;
+
             const debit = await applyStockLedgerEntry({
                 projectId: sourceProjectId,
-                itemId: request.materialId,
-                qtyChange: -quantity,
+                itemId: targetMatId,
+                qtyChange: -qty,
                 transactionType: "TRANSFER_OUT",
                 referenceId: transfer._id,
-                referenceNumber: request.requestNumber,
-                remarks: `Transfer out to fulfil ${request.requestNumber}`,
+                referenceNumber,
+                remarks: `Transfer out to fulfil ${refNumber}`,
                 session,
             });
 
             const credit = await applyStockLedgerEntry({
-                projectId: request.projectId,
-                itemId: request.materialId,
-                qtyChange: quantity,
+                projectId: targetDestId,
+                itemId: targetMatId,
+                qtyChange: qty,
                 transactionType: "TRANSFER_IN",
                 referenceId: transfer._id,
-                referenceNumber: request.requestNumber,
-                remarks: `Transfer in fulfilling ${request.requestNumber}`,
+                referenceNumber,
+                remarks: `Transfer in fulfilling ${refNumber}`,
                 session,
             });
 
@@ -81,18 +94,22 @@ export const createStockTransfer = async (req, res) => {
             transfer.destinationStockBalanceAfter = credit.projectBalance;
             await transfer.save({ session });
 
-            request.status = "APPROVED_TRANSFER";
-            request.updatedBy = req.user.id;
-            await request.save({ session });
+            if (request) {
+                request.status = "APPROVED_TRANSFER";
+                request.updatedBy = req.user.id;
+                await request.save({ session });
+            }
         });
 
-        await logAudit({ module: "StockTransfer", entityId: transfer._id, action: "initiated", performedBy: req.user.id, meta: { quantity } });
-        await notifyUsers({ userIds: [request.requestedBy], title: "Material transfer in progress", message: `${quantity} ${request.unit} of ${request.materialName} is being transferred to your project`, module: "Stock", referenceType: "StockTransfer", referenceId: transfer._id, projectId: request.projectId });
-        await notifyRoles({ roles: ["manager", "admin"], projectId: request.projectId, title: "Incoming stock transfer", message: `${request.materialName} transfer inbound`, module: "Stock", referenceType: "StockTransfer", referenceId: transfer._id });
+        await logAudit({ module: "StockTransfer", entityId: transfer._id, action: "initiated", performedBy: req.user.id, meta: { quantity: qty } });
+        if (request) {
+            await notifyUsers({ userIds: [request.requestedBy], title: "Material transfer in progress", message: `${qty} ${request.unit} of ${request.materialName} is being transferred to your project`, module: "Stock", referenceType: "StockTransfer", referenceId: transfer._id, projectId: targetDestId });
+        }
+        await notifyRoles({ roles: ["manager", "admin"], projectId: targetDestId, title: "Incoming stock transfer", message: `Stock transfer inbound for destination project`, module: "Stock", referenceType: "StockTransfer", referenceId: transfer._id });
 
         return success(res, 201, "Stock transfer created", transfer);
     } catch (error) {
-        return fail(res, 500, "Error creating stock transfer", error);
+        return fail(res, 500, error.message || "Error creating stock transfer", error);
     } finally {
         session.endSession();
     }

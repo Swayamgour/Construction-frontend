@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { BarChart3, Clock, Boxes, Truck, AlertTriangle, CalendarCheck, LayoutDashboard } from "lucide-react";
+import { Link } from "react-router-dom";
+import { BarChart3, Clock, Boxes, Truck, AlertTriangle, CalendarCheck, LayoutDashboard, Users } from "lucide-react";
 import {
     useGetLabourOvertimeReportQuery,
     useGetStockReportQuery,
@@ -221,16 +222,24 @@ const ReportsHub = () => {
                 <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
                     <BarChart3 className="text-blue-800" size={26} /> Reports & Dashboard
                 </h1>
-                <select
-                    value={projectId}
-                    onChange={(e) => setProjectId(e.target.value)}
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                >
-                    <option value="">All Projects</option>
-                    {projects?.map((p) => (
-                        <option key={p._id} value={p._id}>{p.projectName || p.name}</option>
-                    ))}
-                </select>
+                <div className="flex items-center gap-3">
+                    <Link
+                        to="/labour/reports"
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200 transition shadow-sm"
+                    >
+                        <Users size={16} /> Workforce Reports →
+                    </Link>
+                    <select
+                        value={projectId}
+                        onChange={(e) => setProjectId(e.target.value)}
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    >
+                        <option value="">All Projects</option>
+                        {projects?.map((p) => (
+                            <option key={p._id} value={p._id}>{p.projectName || p.name}</option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
             <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-200 pb-2">

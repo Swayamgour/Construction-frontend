@@ -20,6 +20,9 @@ const overtimeSettingsSchema = new mongoose.Schema(
         regularRate: { type: Number, default: 0 }, // per-hour, fallback if labour has no dailyWage
         overtimeMultiplier: { type: Number, default: 1.5 }, // OT rate = regularRate * multiplier
 
+        attendanceCutoffTime: { type: String, default: "20:00" }, // 24h "HH:mm" cutoff for auto-absent
+        autoAbsentEnabled: { type: Boolean, default: true },
+
         updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     },
     { timestamps: true }

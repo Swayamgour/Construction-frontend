@@ -1,56 +1,95 @@
+import mongoose from "mongoose";
 import Project from "../models/Project.js";
 import Labour from "../models/Labour.js";
 import Attendance from "../models/Attendance.js";
-// import Project from "../models/Project.js";
+import LabourAssignment from "../models/LabourAssignment.js";
+import { logAudit } from "../utils/audit.js";
 
+/**
+ * Assigns one or more labours to a project.
+ * Synchronizes LabourAssignment (Single Source of Truth), Project.labours, and Labour.assignedProjects.
+ */
 export const assignLabour = async (req, res) => {
     try {
         const { projectId, labourIds } = req.body;
 
-        // Check Project Exists
+        if (!projectId || !Array.isArray(labourIds) || labourIds.length === 0) {
+            return res.status(400).json({ message: "projectId and labourIds array required" });
+        }
+
         const project = await Project.findById(projectId);
         if (!project) return res.status(404).json({ message: "Project not found" });
 
-        // 📌 Convert to string for accurate matching
-        const alreadyAssigned = project.labours.map(id => id.toString());
+        const assigned = [];
+        const skipped = [];
+        const assignedById = req.user?.id || project.createdBy;
 
-        // 📌 Filter new labours (avoid duplicate assign)
-        const newLabours = labourIds.filter(id => !alreadyAssigned.includes(id));
+        for (const labourId of labourIds) {
+            const labour = await Labour.findById(labourId);
+            if (!labour) {
+                skipped.push({ labourId, reason: "Labour not found" });
+                continue;
+            }
 
-        // 📌 If all are already assigned
-        if (newLabours.length === 0) {
-            return res.status(400).json({
-                message: "All selected labours are already assigned to this project",
-                alreadyAssigned: labourIds,
+            // Check if already actively assigned
+            const existingActive = await LabourAssignment.findOne({ labourId, status: "Active" });
+            if (existingActive) {
+                if (String(existingActive.projectId) === String(projectId)) {
+                    skipped.push({ labourId, reason: "Already active on this project" });
+                } else {
+                    skipped.push({ labourId, reason: `Active on project ${existingActive.projectId}. Use transfer instead.` });
+                }
+                continue;
+            }
+
+            // Create authoritative LabourAssignment record
+            const assignment = await LabourAssignment.create({
+                labourId,
+                projectId,
+                assignmentDate: new Date(),
+                assignedBy: assignedById,
+                status: "Active",
+            });
+
+            // Keep derived arrays synchronized
+            await Labour.updateOne({ _id: labourId }, { $addToSet: { assignedProjects: projectId } });
+            await Project.updateOne({ _id: projectId }, { $addToSet: { labours: labourId } });
+
+            assigned.push(labourId);
+
+            await logAudit({
+                module: "LabourAssignment",
+                entityId: assignment._id,
+                action: "assigned",
+                performedBy: assignedById,
+                meta: { labourId, projectId },
             });
         }
 
-        // 📌 Push new unique labours into project
-        project.labours.push(...newLabours);
-        await project.save();
-
-        // 📌 Update labour document -> assign project
-        await Labour.updateMany(
-            { _id: { $in: newLabours } },
-            { $addToSet: { assignedProjects: projectId } }  // Prevent duplicates
-        );
+        if (assigned.length === 0 && skipped.length > 0) {
+            return res.status(400).json({
+                message: "No labours could be assigned",
+                skipped,
+            });
+        }
 
         return res.status(200).json({
             message: "Labour assigned successfully",
-            assigned: newLabours,
-            project,
+            assigned,
+            skipped,
         });
 
     } catch (error) {
-        res.status(500).json({
+        return res.status(500).json({
             message: "Error assigning labour",
             error: error.message
         });
     }
 };
 
-
-
+/**
+ * Returns project labours with today's attendance status.
+ */
 export const getLaboursByProject = async (req, res) => {
     try {
         const { projectId } = req.query;
@@ -58,44 +97,51 @@ export const getLaboursByProject = async (req, res) => {
         if (!projectId)
             return res.status(400).json({ message: "projectId required" });
 
-        const project = await Project.findById(projectId).populate("labours");
-
+        const project = await Project.findById(projectId);
         if (!project)
             return res.status(404).json({ message: "Project not found" });
 
-        const labourList = project.labours;
+        // Query active assignments from source of truth
+        const activeAssignments = await LabourAssignment.find({
+            projectId,
+            status: "Active",
+        }).populate("labourId");
 
-        // Aaj ka date
+        const labourList = activeAssignments
+            .map((a) => a.labourId)
+            .filter((l) => l && l.status === "Active");
+
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
 
         const todayEnd = new Date();
         todayEnd.setHours(23, 59, 59, 999);
 
-        // Aaj ki attendance
         const attendanceRecords = await Attendance.find({
             projectId,
             date: { $gte: todayStart, $lte: todayEnd }
         });
 
-        // Map for fast lookup
         const attendanceMap = {};
         attendanceRecords.forEach((att) => {
             attendanceMap[att.labourId.toString()] = {
                 attendanceToday: true,
                 status: att.status,
-                timeIn: att.timeIn,
-                timeOut: att.timeOut
+                timeIn: att.checkInTime || att.timeIn,
+                timeOut: att.checkOutTime || att.timeOut,
+                approvalStatus: att.approvalStatus,
+                overtimeHours: att.overtimeHours || 0,
             };
         });
 
-        // Merge labour + attendance
         const response = labourList.map((lab) => {
             const att = attendanceMap[lab._id.toString()] || {
                 attendanceToday: false,
                 status: "Not Marked",
                 timeIn: null,
-                timeOut: null
+                timeOut: null,
+                approvalStatus: null,
+                overtimeHours: 0,
             };
 
             return {
@@ -117,13 +163,13 @@ export const getLaboursByProject = async (req, res) => {
     }
 };
 
-
-
-
-
+/**
+ * Unassigns/releases labour from a project.
+ * Updates LabourAssignment to "Released" and updates derived arrays.
+ */
 export const unassignLabour = async (req, res) => {
     try {
-        const { labourId, projectId } = req.body;
+        const { labourId, projectId, reason } = req.body;
 
         if (!labourId || !projectId)
             return res.status(400).json({ message: "labourId and projectId required" });
@@ -134,17 +180,27 @@ export const unassignLabour = async (req, res) => {
         const project = await Project.findById(projectId);
         if (!project) return res.status(404).json({ message: "Project not found" });
 
-        // 1) Remove project from labour
-        labour.assignedProjects = labour.assignedProjects.filter(
-            (p) => p.toString() !== projectId
-        );
-        await labour.save();
+        // Close active assignment
+        const activeAssignment = await LabourAssignment.findOne({ labourId, projectId, status: "Active" });
+        if (activeAssignment) {
+            activeAssignment.status = "Released";
+            activeAssignment.releaseDate = new Date();
+            activeAssignment.releasedBy = req.user?.id || null;
+            activeAssignment.releaseReason = reason || "Unassigned from project";
+            await activeAssignment.save();
 
-        // 2) Remove labour from project
-        project.labours = project.labours.filter(
-            (l) => l.toString() !== labourId
-        );
-        await project.save();
+            await logAudit({
+                module: "LabourAssignment",
+                entityId: activeAssignment._id,
+                action: "released",
+                performedBy: req.user?.id,
+                meta: { labourId, projectId, reason },
+            });
+        }
+
+        // Remove from derived arrays
+        await Labour.updateOne({ _id: labourId }, { $pull: { assignedProjects: projectId } });
+        await Project.updateOne({ _id: projectId }, { $pull: { labours: labourId } });
 
         return res.status(200).json({
             message: "Labour unassigned successfully",
@@ -160,49 +216,74 @@ export const unassignLabour = async (req, res) => {
     }
 };
 
-
-
+/**
+ * Transfers/reassigns labour from old project to new project.
+ * Closes old assignment (Transferred), opens new assignment (Active), links previousAssignmentId.
+ */
 export const reassignLabour = async (req, res) => {
     try {
-        const { labourId, oldProjectId, newProjectId } = req.body;
+        const { labourId, oldProjectId, newProjectId, transferReason } = req.body;
 
         if (!labourId || !oldProjectId || !newProjectId)
             return res.status(400).json({ message: "Missing fields" });
 
-        const labour = await Labour.findById(labourId);
-        const oldProject = await Project.findById(oldProjectId);
-        const newProject = await Project.findById(newProjectId);
+        const [labour, oldProject, newProject] = await Promise.all([
+            Labour.findById(labourId),
+            Project.findById(oldProjectId),
+            Project.findById(newProjectId),
+        ]);
 
         if (!labour) return res.status(404).json({ message: "Labour not found" });
         if (!oldProject) return res.status(404).json({ message: "Old project not found" });
         if (!newProject) return res.status(404).json({ message: "New project not found" });
 
-        // 1) Remove from labour
-        labour.assignedProjects = labour.assignedProjects.filter(
-            (p) => p.toString() !== oldProjectId
-        );
+        const when = new Date();
+        const activeAssignment = await LabourAssignment.findOne({ labourId, projectId: oldProjectId, status: "Active" });
 
-        // 2) Add new project
-        if (!labour.assignedProjects.includes(newProjectId)) {
-            labour.assignedProjects.push(newProjectId);
+        let previousAssignmentId = null;
+        if (activeAssignment) {
+            activeAssignment.status = "Transferred";
+            activeAssignment.releaseDate = when;
+            activeAssignment.transferDate = when;
+            activeAssignment.transferredBy = req.user?.id || null;
+            activeAssignment.transferReason = transferReason || "Reassigned";
+            await activeAssignment.save();
+            previousAssignmentId = activeAssignment._id;
         }
-        await labour.save();
 
-        // 3) Remove labour from old project
-        oldProject.labours = oldProject.labours.filter(
-            (l) => l.toString() !== labourId
-        );
-        await oldProject.save();
+        // Create new active assignment
+        const newAssignment = await LabourAssignment.create({
+            labourId,
+            projectId: newProjectId,
+            previousProjectId: oldProjectId,
+            previousAssignmentId,
+            assignmentDate: when,
+            assignedBy: req.user?.id || oldProject.createdBy,
+            transferredBy: req.user?.id || null,
+            transferReason: transferReason || "Reassigned",
+            status: "Active",
+        });
 
-        // 4) Add labour to new project
-        if (!newProject.labours.includes(labourId)) {
-            newProject.labours.push(labourId);
-        }
-        await newProject.save();
+        // Sync derived arrays
+        await Labour.updateOne({ _id: labourId }, {
+            $pull: { assignedProjects: oldProjectId },
+            $addToSet: { assignedProjects: newProjectId }
+        });
+        await Project.updateOne({ _id: oldProjectId }, { $pull: { labours: labourId } });
+        await Project.updateOne({ _id: newProjectId }, { $addToSet: { labours: labourId } });
+
+        await logAudit({
+            module: "LabourAssignment",
+            entityId: newAssignment._id,
+            action: "transferred",
+            performedBy: req.user?.id,
+            meta: { labourId, oldProjectId, newProjectId },
+        });
 
         return res.status(200).json({
             message: "Labour reassigned successfully",
-            labour
+            assignment: newAssignment,
+            labour,
         });
 
     } catch (error) {
@@ -212,4 +293,3 @@ export const reassignLabour = async (req, res) => {
         });
     }
 };
-

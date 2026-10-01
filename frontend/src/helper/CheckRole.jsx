@@ -1,8 +1,10 @@
 import { useUserDetailQuery } from "../Reduxe/Api";
 
 export const CheckRole = () => {
-    
+
     const { data, isLoading, isError } = useUserDetailQuery();
+
+    console.log("data", data);
 
     return {
         role: data?.user?.role,
@@ -11,3 +13,5 @@ export const CheckRole = () => {
         isError
     };
 };
+
+export default CheckRole;

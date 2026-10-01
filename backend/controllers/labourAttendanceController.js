@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Attendance from "../models/Attendance.js";
 import Labour from "../models/Labour.js";
+import LabourAssignment from "../models/LabourAssignment.js";
 import Project from "../models/Project.js";
 import {
     getEffectiveOvertimeSettings,
@@ -65,12 +66,28 @@ const getAssignedLabour = async (projectId, labourId) => {
     if (!labour) throw httpError(404, "Labour not found");
     if (labour.status !== "Active") throw httpError(400, `Labour is ${labour.status}`);
 
-    const assigned = (labour.assignedProjects || []).some(
+    let activeAssignment = await LabourAssignment.findOne({
+        labourId,
+        projectId,
+        status: "Active",
+    });
+
+    let assigned = (labour.assignedProjects || []).some(
         (p) => String(p) === String(projectId)
     );
-    if (!assigned) throw httpError(400, "Labour is not assigned to this project");
 
-    return labour;
+    if (activeAssignment && !assigned) {
+        await Labour.findByIdAndUpdate(labourId, {
+            $addToSet: { assignedProjects: projectId },
+        });
+        assigned = true;
+    }
+
+    if (!assigned && !activeAssignment) {
+        throw httpError(400, "Labour is not assigned to this project");
+    }
+
+    return { labour, assignmentId: activeAssignment?._id || null };
 };
 
 /** A labour cannot be paid in two projects for the same day. */
@@ -232,7 +249,7 @@ export const punchInLabour = async (req, res) => {
         const time = checkInTime || nowHHmm();
         if (!isValidTime(time)) throw httpError(400, "checkInTime must be HH:mm");
 
-        await getAssignedLabour(projectId, labourId);
+        const { labour, assignmentId } = await getAssignedLabour(projectId, labourId);
 
         const today = startOfDay();
 
@@ -244,6 +261,7 @@ export const punchInLabour = async (req, res) => {
         const attendance = await Attendance.create({
             projectId,
             labourId,
+            assignmentId,
             date: today,
             status: "Present",
             shift: shift || "Morning",
@@ -289,7 +307,7 @@ export const punchOutLabour = async (req, res) => {
         const time = checkOutTime || nowHHmm();
         if (!isValidTime(time)) throw httpError(400, "checkOutTime must be HH:mm");
 
-        const labour = await getAssignedLabour(projectId, labourId);
+        const { labour } = await getAssignedLabour(projectId, labourId);
         const day = date ? startOfDay(date) : startOfDay();
 
         const record = await Attendance.findOne({ projectId, labourId, date: day });
@@ -356,7 +374,7 @@ export const markLabourAttendance = async (req, res) => {
             throw httpError(400, "Times must be in HH:mm format");
         }
 
-        const labour = await getAssignedLabour(projectId, labourId);
+        const { labour, assignmentId } = await getAssignedLabour(projectId, labourId);
         const today = startOfDay();
 
         if (await Attendance.findOne({ projectId, labourId, date: today })) {
@@ -382,6 +400,7 @@ export const markLabourAttendance = async (req, res) => {
         const attendance = await Attendance.create({
             projectId,
             labourId,
+            assignmentId,
             date: today,
             status,
             shift: shift || "Morning",
@@ -416,10 +435,21 @@ export const markBulkLabourAttendance = async (req, res) => {
 
         // Only active labours assigned to this project
         const labourIds = attendance.map((a) => a.labourId).filter(isObjId);
+
+        const activeAssignments = await LabourAssignment.find({
+            labourId: { $in: labourIds },
+            projectId,
+            status: "Active",
+        }).select("labourId _id");
+        const assignmentMap = new Map(activeAssignments.map((a) => [String(a.labourId), a._id]));
+
         const validLabours = await Labour.find({
             _id: { $in: labourIds },
-            assignedProjects: projectId,
             status: "Active",
+            $or: [
+                { assignedProjects: projectId },
+                { _id: { $in: activeAssignments.map((a) => a.labourId) } },
+            ],
         }).select("_id");
         const validSet = new Set(validLabours.map((l) => String(l._id)));
 
@@ -454,11 +484,14 @@ export const markBulkLabourAttendance = async (req, res) => {
                 continue;
             }
 
+            const assignmentId = assignmentMap.get(id) || null;
+
             operations.push({
                 updateOne: {
                     filter: { projectId, labourId: it.labourId, date: today },
                     update: {
                         $set: {
+                            assignmentId,
                             status: it.status,
                             checkInTime: it.timeIn || null,
                             checkOutTime: it.timeOut || null,
@@ -650,7 +683,7 @@ export const getLabourAttendanceRecords = async (req, res) => {
         const [items, total, agg] = await Promise.all([
             Attendance.find(filter)
                 .populate("projectId", "projectName projectCode")
-                .populate("labourId", "name phone category skillLevel")
+                .populate("labourId", "name phone category skillLevel labourType dailyWage fatherName")
                 .populate("markedBy", "name")
                 .populate("approvedBy", "name")
                 .sort({ date: -1, createdAt: -1 })
@@ -785,7 +818,7 @@ export const recordLabourWorkingTime = async (req, res) => {
             return fail(res, 400, "Times must be in HH:mm format");
         }
 
-        const labour = await getAssignedLabour(projectId, labourId);
+        const { labour, assignmentId } = await getAssignedLabour(projectId, labourId);
 
         const day = startOfDay(date || new Date());
 
@@ -809,6 +842,7 @@ export const recordLabourWorkingTime = async (req, res) => {
                     ...update,
                     projectId,
                     labourId,
+                    assignmentId,
                     date: day,
                     status: status || "Present",
                     remarks: remarks || "",

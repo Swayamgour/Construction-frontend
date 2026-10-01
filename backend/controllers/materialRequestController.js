@@ -1,4 +1,7 @@
 import MaterialRequest from "../models/MaterialRequest.js";
+import PurchaseOrder from "../models/PurchaseOrder.js";
+import StockRequest from "../models/StockRequest.js";
+import Item from "../models/Item.js";
 
 // ADD MATERIAL REQUEST
 export const addMaterialRequest = async (req, res) => {
@@ -28,6 +31,33 @@ export const addMaterialRequest = async (req, res) => {
             items,
             requestedBy: req.user.id
         });
+
+        // Mirror each item to StockRequest collection so that both systems stay in sync
+        try {
+            for (const it of items) {
+                const itemDoc = await Item.findById(it.itemId);
+                if (itemDoc) {
+                    await StockRequest.create({
+                        projectId,
+                        requestedBy: req.user.id,
+                        requestedByRole: req.user.role || "manager",
+                        materialId: it.itemId,
+                        materialName: itemDoc.name,
+                        category: itemDoc.category || "",
+                        quantity: Number(it.requestedQty),
+                        unit: it.unit || itemDoc.unit || "unit",
+                        requiredDate: requiredDate || new Date(),
+                        priority: it.priority || "Medium",
+                        purpose: it.purpose || `MR-${newReq._id}`,
+                        description: it.remarks || "",
+                        status: "PENDING_ADMIN_REVIEW",
+                        createdBy: req.user.id,
+                    });
+                }
+            }
+        } catch (syncErr) {
+            console.warn("StockRequest sync error:", syncErr.message);
+        }
 
         res.status(201).json({
             message: "Material Request submitted",
@@ -114,6 +144,16 @@ export const rejectMaterialRequest = async (req, res) => {
 
         if (!updated) return res.status(404).json({ message: "MR not found" });
 
+        // Sync linked StockRequest records to REJECTED
+        try {
+            await StockRequest.updateMany(
+                { projectId: updated.projectId, materialId: { $in: updated.items.map(i => i.itemId) }, status: "PENDING_ADMIN_REVIEW" },
+                { $set: { status: "REJECTED", reviewedBy: req.user.id, reviewedAt: new Date() } }
+            );
+        } catch (srErr) {
+            console.warn("StockRequest reject sync note:", srErr.message);
+        }
+
         res.status(200).json({ message: "MR Rejected", data: updated });
 
     } catch (error) {
@@ -162,6 +202,74 @@ export const approveMaterialRequest = async (req, res) => {
         }
 
         const totalAmount = finalItems.reduce((t, a) => t + a.amount, 0);
+        const poNumber = "PO-" + Date.now();
+
+        // Create official PurchaseOrder document(s) so PO appears in Purchase Orders screen and can be received via GRN
+        let createdPo = null;
+        try {
+            if (poMode === "single" && vendorId) {
+                const poItems = finalItems.map(it => ({
+                    itemId: it.itemId,
+                    qty: Number(it.requestedQty || 0),
+                    unit: it.unit || "",
+                    rate: Number(it.unitPrice || 0),
+                    amount: Number(it.amount || 0),
+                    tax: Number(it.gst || 0),
+                    discount: Number(it.discount || 0),
+                    total: Number(it.amount || 0),
+                    materialRequestId: mr._id,
+                    receivedQty: 0,
+                }));
+                createdPo = await PurchaseOrder.create({
+                    projectId: mr.projectId,
+                    vendorId,
+                    items: poItems,
+                    subtotal: totalAmount,
+                    grandTotal: totalAmount,
+                    status: "ORDERED",
+                    createdBy: req.user.id,
+                    orderedAt: new Date(),
+                    orderedBy: req.user.id,
+                });
+            } else if (poMode !== "single") {
+                const vendorGroups = {};
+                for (const it of finalItems) {
+                    if (it.vendorId) {
+                        const vKey = String(it.vendorId);
+                        if (!vendorGroups[vKey]) vendorGroups[vKey] = [];
+                        vendorGroups[vKey].push(it);
+                    }
+                }
+                for (const [vId, vItems] of Object.entries(vendorGroups)) {
+                    const poItems = vItems.map(it => ({
+                        itemId: it.itemId,
+                        qty: Number(it.requestedQty || 0),
+                        unit: it.unit || "",
+                        rate: Number(it.unitPrice || 0),
+                        amount: Number(it.amount || 0),
+                        tax: Number(it.gst || 0),
+                        discount: Number(it.discount || 0),
+                        total: Number(it.amount || 0),
+                        materialRequestId: mr._id,
+                        receivedQty: 0,
+                    }));
+                    const grTotal = poItems.reduce((s, i) => s + i.amount, 0);
+                    createdPo = await PurchaseOrder.create({
+                        projectId: mr.projectId,
+                        vendorId: vId,
+                        items: poItems,
+                        subtotal: grTotal,
+                        grandTotal: grTotal,
+                        status: "ORDERED",
+                        createdBy: req.user.id,
+                        orderedAt: new Date(),
+                        orderedBy: req.user.id,
+                    });
+                }
+            }
+        } catch (poErr) {
+            console.warn("PurchaseOrder creation note:", poErr.message);
+        }
 
         const updated = await MaterialRequest.findByIdAndUpdate(
             mrId,
@@ -173,16 +281,28 @@ export const approveMaterialRequest = async (req, res) => {
                 deliveryDate,
                 paymentTerms,
                 totalAmount,
-                poNumber: "PO-" + Date.now(),
+                poNumber,
+                purchaseOrderId: createdPo ? createdPo._id : null,
                 approvedBy: req.user.id,
                 approvalDate: new Date()
             },
             { new: true }
         );
 
+        // Update any linked StockRequests
+        try {
+            await StockRequest.updateMany(
+                { projectId: mr.projectId, materialId: { $in: mr.items.map(i => i.itemId) }, status: "PENDING_ADMIN_REVIEW" },
+                { $set: { status: "APPROVED_PROCUREMENT", reviewedBy: req.user.id, reviewedAt: new Date() } }
+            );
+        } catch (srErr) {
+            console.warn("StockRequest status sync note:", srErr.message);
+        }
+
         return res.status(200).json({
             message: "PO Generated Successfully",
-            PO: updated
+            PO: updated,
+            purchaseOrder: createdPo
         });
 
     } catch (error) {

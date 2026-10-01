@@ -58,11 +58,11 @@ router.get(
     getLabourTodayStatus
 );
 
-// --- Step 1: supervisor / manager marks attendance ---
+// --- Step 1: admin / supervisor / manager marks attendance ---
 router.post(
     "/labour/punch-in",
     auth,
-    roleCheck("supervisor", "manager"),
+    roleCheck("admin", "supervisor", "manager"),
     selfieUpload.single("selfie"), // optional photo
     checkProjectAccess(),
     punchInLabour
@@ -71,7 +71,7 @@ router.post(
 router.post(
     "/labour/punch-out",
     auth,
-    roleCheck("supervisor", "manager"),
+    roleCheck("admin", "supervisor", "manager"),
     checkProjectAccess(),
     punchOutLabour
 );
@@ -80,7 +80,7 @@ router.post(
 router.post(
     "/labour/mark",
     auth,
-    roleCheck("supervisor", "manager"),
+    roleCheck("admin", "supervisor", "manager"),
     checkProjectAccess(),
     markLabourAttendance
 );
@@ -88,7 +88,7 @@ router.post(
 router.post(
     "/labour/mark-bulk",
     auth,
-    roleCheck("supervisor", "manager"),
+    roleCheck("admin", "supervisor", "manager"),
     checkProjectAccess(),
     markBulkLabourAttendance
 );
