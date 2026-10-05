@@ -5,7 +5,7 @@ import {
     useChangeOperatorMutation,
     useRemoveOperatorMutation,
     useGetOperatorAssignmentHistoryQuery,
-    useGetUsersQuery,
+    useGetLabourQuery,
 } from "../../Reduxe/Api";
 import { CheckRole } from "../../helper/CheckRole";
 
@@ -43,10 +43,11 @@ export default function OperatorAssignmentPanel({ assignment, onChanged }) {
     );
     const history = historyResp?.data?.history || [];
 
-    // Reuse the existing user list to let admin/manager pick an operator by
-    // name instead of pasting a raw ObjectId.
-    const { data: usersResp } = useGetUsersQuery(undefined, { skip: !canManage || mode === null });
-    const operators = (usersResp?.users || usersResp?.data || usersResp || []).filter((u) => u.role === "operator");
+    // Query Labour collection (canonical site workforce) for operators
+    const { data: labourResp } = useGetLabourQuery(undefined, { skip: !canManage || mode === null });
+    const allLabours = Array.isArray(labourResp) ? labourResp : labourResp?.data || [];
+    const operators = allLabours.filter((l) => l.category === "Operator");
+    const displayOperators = operators.length > 0 ? operators : allLabours;
 
     if (!assignment) return null;
 
@@ -133,8 +134,10 @@ export default function OperatorAssignmentPanel({ assignment, onChanged }) {
                                 className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
                             >
                                 <option value="">Select operator</option>
-                                {operators.map((u) => (
-                                    <option key={u._id} value={u._id}>{u.name}</option>
+                                {displayOperators.map((u) => (
+                                    <option key={u._id} value={u._id}>
+                                        {u.labourId ? `[${u.labourId}] ` : ""}{u.name} {u.phone ? `(${u.phone})` : ""}
+                                    </option>
                                 ))}
                             </select>
                         </div>

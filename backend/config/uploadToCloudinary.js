@@ -1,28 +1,8 @@
-import cloudinary from "../config/cloudinary.js";
-import streamifier from "streamifier";
+import { uploadToCloudinary as utilUpload } from "../utils/cloudUpload.js";
 
-const uploadToCloudinary = (file, folder = "projects") => {
-  return new Promise((resolve, reject) => {
-    if (!file?.buffer) {
-      return reject(new Error("File buffer not found"));
-    }
-
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder,
-        resource_type: "auto",
-      },
-      (error, result) => {
-        if (error) {
-          return reject(error);
-        }
-
-        resolve(result);
-      }
-    );
-
-    streamifier.createReadStream(file.buffer).pipe(stream);
-  });
+const uploadToCloudinary = async (file, folder = "projects") => {
+  const url = await utilUpload(file, folder);
+  return { secure_url: url, url };
 };
 
-export default uploadToCloudinary;
+export default uploadToCloudinary;

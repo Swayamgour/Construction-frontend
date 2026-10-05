@@ -2,7 +2,7 @@ import EmployeeAttendance from "../models/EmployeeAttendance.js";
 import Employee from "../models/Employee.js";
 import User from "../models/User.js";
 import mongoose from "mongoose";
-import cloudinary from "../config/cloudinary.js"
+import { uploadToCloudinary } from "../utils/cloudUpload.js";
 
 /* helper start of day */
 const startOfDay = (d = new Date()) => {
@@ -46,13 +46,7 @@ export const markEmployeeAttendance = async (req, res) => {
 
 
         if (req.file) {
-            const base64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
-
-            const uploadRes = await cloudinary.uploader.upload(base64, {
-                folder: "attendance/selfies"
-            });
-
-            selfiePath = uploadRes.secure_url;
+            selfiePath = await uploadToCloudinary(req.file, "attendance/selfies");
         }
 
         const record = await EmployeeAttendance.create({

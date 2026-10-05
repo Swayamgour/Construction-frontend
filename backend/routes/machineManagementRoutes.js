@@ -1,7 +1,7 @@
 import express from "express";
 import { auth } from "../middleware/auth.js";
 import { roleCheck } from "../middleware/role.js";
-import { uploadValidated } from "../middleware/uploadValidated.js";
+// import { upload } from "../middleware/upload.js";
 import { checkProjectAccess, resolveProjectFrom } from "../middleware/projectAccess.js";
 import MachineRequest from "../models/MachineRequest.js";
 import MachineAssignment from "../models/MachineAssignment.js";
@@ -12,11 +12,15 @@ import {
     approveMachineRequest,
     rejectMachineRequest,
     allocateMachineRequest,
+    procureVendorMachine,
     dispatchMachineRequest,
     receiveMachineAtSite,
+    rejectMachineAtSite,
+    cancelMachineRequest,
     releaseMachineRequest,
     getMachineRequestHistory,
 } from "../controllers/machineRequestController.js";
+import { transferMachine } from "../controllers/assignmentController.js";
 
 import {
     addMachineDocument,
@@ -42,6 +46,7 @@ import {
     getMeterBasedMaintenanceDue,
     getFullMaintenanceHistory,
 } from "../controllers/maintenanceController.js";
+import upload from "../middleware/upload.js";
 
 const router = express.Router();
 
@@ -62,7 +67,7 @@ router.post(
     "/requests",
     auth,
     roleCheck("admin", "manager", "supervisor"),
-    uploadValidated.fields([{ name: "attachments", maxCount: 4 }]),
+    upload.fields([{ name: "attachments", maxCount: 4 }]),
     checkProjectAccess(),
     createMachineRequest
 );
@@ -70,13 +75,23 @@ router.get("/requests", auth, roleCheck("admin", "manager", "supervisor"), listM
 router.get("/requests/:id/history", auth, roleCheck("admin", "manager", "supervisor"), checkProjectAccess(machineRequestProject), getMachineRequestHistory);
 router.patch("/requests/:id/approve", auth, roleCheck("admin"), checkProjectAccess(machineRequestProject), approveMachineRequest);
 router.patch("/requests/:id/reject", auth, roleCheck("admin"), checkProjectAccess(machineRequestProject), rejectMachineRequest);
+router.patch("/requests/:id/cancel", auth, roleCheck("admin", "manager", "supervisor"), checkProjectAccess(machineRequestProject), cancelMachineRequest);
 router.patch("/requests/:id/allocate", auth, roleCheck("admin"), checkProjectAccess(machineRequestProject), allocateMachineRequest);
+router.patch("/requests/:id/vendor-procure", auth, roleCheck("admin"), checkProjectAccess(machineRequestProject), procureVendorMachine);
 router.patch("/requests/:id/dispatch", auth, roleCheck("admin"), checkProjectAccess(machineRequestProject), dispatchMachineRequest);
-router.patch("/requests/:id/receive", auth, roleCheck("admin", "manager", "supervisor"), checkProjectAccess(machineRequestProject), receiveMachineAtSite);
+router.patch(
+    "/requests/:id/receive",
+    auth,
+    roleCheck("admin", "manager", "supervisor"),
+    upload.fields([{ name: "arrivalPhotos", maxCount: 4 }]),
+    checkProjectAccess(machineRequestProject),
+    receiveMachineAtSite
+);
+router.patch("/requests/:id/site-reject", auth, roleCheck("admin", "manager", "supervisor"), checkProjectAccess(machineRequestProject), rejectMachineAtSite);
 router.patch("/requests/:id/release", auth, roleCheck("admin", "manager"), checkProjectAccess(machineRequestProject), releaseMachineRequest);
 
 /* ------------------------------ DOCUMENTS -------------------------------- */
-router.post("/:id/documents", auth, roleCheck("admin", "manager"), uploadValidated.single("file"), addMachineDocument);
+router.post("/:id/documents", auth, roleCheck("admin", "manager"), upload.single("file"), addMachineDocument);
 router.get("/:id/documents", auth, roleCheck("admin", "manager", "supervisor", "operator"), listMachineDocuments);
 router.patch("/documents/:docId/verify", auth, roleCheck("admin", "manager"), verifyMachineDocument);
 router.get("/documents/expiring", auth, roleCheck("admin", "manager"), getExpiringDocuments);
@@ -91,13 +106,14 @@ router.post("/assignments/:assignmentId/operator", auth, roleCheck("admin", "man
 router.patch("/assignments/:assignmentId/operator/change", auth, roleCheck("admin", "manager"), checkProjectAccess(machineAssignmentProject), changeOperator);
 router.patch("/assignments/:assignmentId/operator/remove", auth, roleCheck("admin", "manager"), checkProjectAccess(machineAssignmentProject), removeOperator);
 router.get("/assignments/:assignmentId/operator/history", auth, roleCheck("admin", "manager", "supervisor"), checkProjectAccess(machineAssignmentProject), getOperatorAssignmentHistory);
+router.post("/assignments/transfer", auth, roleCheck("admin", "manager"), transferMachine);
 
 /* ------------------------------ MAINTENANCE ------------------------------- */
 router.post(
     "/:id/maintenance",
     auth,
     roleCheck("admin", "manager", "supervisor"),
-    uploadValidated.fields([{ name: "beforeImages", maxCount: 4 }, { name: "afterImages", maxCount: 4 }, { name: "invoice", maxCount: 1 }]),
+    upload.fields([{ name: "beforeImages", maxCount: 4 }, { name: "afterImages", maxCount: 4 }, { name: "invoice", maxCount: 1 }]),
     reportMaintenance
 );
 router.get("/:id/maintenance/full", auth, roleCheck("admin", "manager", "supervisor", "operator"), getFullMaintenanceHistory);

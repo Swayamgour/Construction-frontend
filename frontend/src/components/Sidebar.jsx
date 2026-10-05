@@ -57,7 +57,7 @@ const NAV_GROUPS = [
     label: "Materials & Inventory",
     items: [
       { name: "Material Requests", icon: ClipboardList, path: "/stock/requests", roles: ["admin", "manager", "supervisor", "storekeeper"] },
-      { name: "Purchase Orders", icon: Store, path: "/purchase-orders", roles: ["admin", "manager", "storekeeper"] },
+      { name: "Purchase Orders", icon: Store, path: "/purchase-orders", roles: ["admin"] },
       { name: "Goods Receipts (GRN)", icon: Boxes, path: "/stock/operations?tab=receipts", roles: ["admin", "manager", "storekeeper", "supervisor"] },
       { name: "Inventory", icon: Boxes, path: "/stock/operations?tab=inventory", roles: ["admin", "manager", "storekeeper", "supervisor"] },
       { name: "Transfers", icon: ArrowRightLeft, path: "/stock/operations?tab=transfers", roles: ["admin", "manager", "storekeeper"] },
@@ -71,8 +71,10 @@ const NAV_GROUPS = [
   {
     label: "Machinery",
     items: [
-      { name: "Machine", icon: Factory, path: "/machine/list", roles: ["admin", "manager", "supervisor"] },
+      { name: "Machine Dashboard", icon: BarChart2, path: "/machine/dashboard", roles: ["admin", "manager", "supervisor"] },
+      { name: "Machines", icon: Factory, path: "/machine/list", roles: ["admin", "manager", "supervisor"] },
       { name: "Machine Requests", icon: Truck, path: "/machinery/requests", roles: ["admin", "manager", "supervisor"] },
+      { name: "Machine Assignments", icon: ArrowRightLeft, path: "/assign/active", roles: ["admin", "manager", "supervisor"] },
     ],
   },
   {

@@ -27,10 +27,15 @@ export default function AddEditMachine() {
 
     const [form, setForm] = useState({
         machineNumber: "",
+        brand: "",
+        model: "",
         engineNumber: "",
         chassisNumber: "",
         machineType: "",
         ownedOrRented: "owned",
+        hourlyRate: "",
+        currentMeterReading: "",
+        currentFuelLevel: "",
         rcExpiry: "",
         insuranceExpiry: "",
         notes: "",
@@ -43,10 +48,15 @@ export default function AddEditMachine() {
             const m = data.machine;
             setForm({
                 machineNumber: m.machineNumber || "",
+                brand: m.brand || "",
+                model: m.model || "",
                 engineNumber: m.engineNumber || "",
                 chassisNumber: m.chassisNumber || "",
                 machineType: m.machineType || "",
                 ownedOrRented: m.ownedOrRented || "owned",
+                hourlyRate: m.hourlyRate || "",
+                currentMeterReading: m.currentMeterReading || "",
+                currentFuelLevel: m.currentFuelLevel || "",
                 rcExpiry: m.rcExpiry ? m.rcExpiry.slice(0, 10) : "",
                 insuranceExpiry: m.insuranceExpiry ? m.insuranceExpiry.slice(0, 10) : "",
                 notes: m.notes || "",
@@ -87,7 +97,7 @@ export default function AddEditMachine() {
                 await addMachine(fd).unwrap();
                 toast.success("Machine added successfully");
             }
-            navigate("/machines");
+            navigate("/machine/list");
         } catch (err) {
             toast.error(err?.data?.message || "Error saving machine");
         }
@@ -122,6 +132,47 @@ export default function AddEditMachine() {
                     onChange={(e) => setForm({ ...form, machineType: e.target.value })}
                     required
                 />
+
+                <div className="grid grid-cols-2 gap-3">
+                    <input
+                        type="text"
+                        placeholder="Brand / Manufacturer"
+                        value={form.brand}
+                        className="border p-2 rounded"
+                        onChange={(e) => setForm({ ...form, brand: e.target.value })}
+                    />
+                    <input
+                        type="text"
+                        placeholder="Model"
+                        value={form.model}
+                        className="border p-2 rounded"
+                        onChange={(e) => setForm({ ...form, model: e.target.value })}
+                    />
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                    <input
+                        type="number"
+                        placeholder="Hourly Rate (₹)"
+                        value={form.hourlyRate}
+                        className="border p-2 rounded"
+                        onChange={(e) => setForm({ ...form, hourlyRate: e.target.value })}
+                    />
+                    <input
+                        type="number"
+                        placeholder="Meter (hrs)"
+                        value={form.currentMeterReading}
+                        className="border p-2 rounded"
+                        onChange={(e) => setForm({ ...form, currentMeterReading: e.target.value })}
+                    />
+                    <input
+                        type="number"
+                        placeholder="Fuel (L)"
+                        value={form.currentFuelLevel}
+                        className="border p-2 rounded"
+                        onChange={(e) => setForm({ ...form, currentFuelLevel: e.target.value })}
+                    />
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                     <input

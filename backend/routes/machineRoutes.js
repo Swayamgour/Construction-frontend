@@ -7,7 +7,8 @@ import {
   getAllMachines,
   getMachineDetails,
   updateMachine,
-  deleteMachine
+  deleteMachine,
+  getMachineDashboardStats,
 } from "../controllers/machineController.js";
 
 import {
@@ -15,20 +16,7 @@ import {
   getMaintenanceHistory
 } from "../controllers/maintenanceController.js";
 
-import {
-  upsertDailyUsage,
-  getDailyUsage
-} from "../controllers/usageController.js";
-
 const router = express.Router();
-
-/* -------------------------------------------
-   🔒 SECURITY FIX: is poori file me pehle koi
-   `auth` middleware hi nahi tha — matlab bina
-   login kiye bhi machine add/view/maintenance
-   sab kuch access ho sakta tha. Ab har route
-   auth + role protected hai.
--------------------------------------------- */
 
 /* -------------------------------------------
    MACHINE ADD WITH MULTIPLE FILES (CLOUD)
@@ -43,6 +31,16 @@ router.post(
     { name: "insuranceFile", maxCount: 1 }
   ]),
   addMachine
+);
+
+/* -------------------------------------------
+   MACHINE DASHBOARD STATS
+-------------------------------------------- */
+router.get(
+  "/dashboard/stats",
+  auth,
+  roleCheck("admin", "manager", "supervisor"),
+  getMachineDashboardStats
 );
 
 /* -------------------------------------------
@@ -63,8 +61,7 @@ router.get(
 );
 
 /* -------------------------------------------
-   MACHINE UPDATE / DELETE — added to close a frontend gap
-   (Add/Edit Machine form had no matching backend route before this).
+   MACHINE UPDATE / DELETE
 -------------------------------------------- */
 router.put(
   "/:id",
@@ -101,23 +98,6 @@ router.get(
   auth,
   roleCheck("admin", "manager", "supervisor", "operator"),
   getMaintenanceHistory
-);
-
-/* -------------------------------------------
-   DAILY USAGE (operator logs their own machine usage)
--------------------------------------------- */
-router.post(
-  "/usage",
-  auth,
-  roleCheck("admin", "manager", "supervisor", "operator"),
-  upsertDailyUsage
-);
-
-router.get(
-  "/usage",
-  auth,
-  roleCheck("admin", "manager", "supervisor", "operator"),
-  getDailyUsage
 );
 
 export default router;

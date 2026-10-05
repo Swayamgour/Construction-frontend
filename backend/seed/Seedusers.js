@@ -41,7 +41,7 @@ import Machine from "../models/Machine.js";
 import Item from "../models/Item.js";
 import Stock from "../models/Stock.js";
 import LabourAssignment from "../models/LabourAssignment.js";
-import MachineAllocation from "../models/MachineAllocation.js";
+import MachineAssignment from "../models/MachineAssignment.js";
 
 const COMMON_PASSWORD = "Test@123";
 
@@ -392,40 +392,46 @@ async function run() {
     console.log("🔗 Labour assignments linked to Alpha & Beta projects");
 
     /* ======================================================================
-     * 8. MACHINE ALLOCATION — machines allotted to projects w/ operator
+     * 8. MACHINE ASSIGNMENT — machines allotted to projects w/ operator
      * ==================================================================== */
-    const allocationDefs = [
+    const assignmentDefs = [
         {
             machineId: machines["UP78-EXC-101"]._id,
             projectId: projects["PRJ-ALPHA-001"]._id,
-            operatorName: labours.operator1.name,
-            startDate: new Date("2026-01-20"),
+            operatorId: labours.operator1._id,
+            assignDate: new Date("2026-01-20"),
+            assignedFrom: new Date("2026-01-20"),
+            assignmentStatus: "ACTIVE",
             assignedBy: users.manager1._id,
         },
         {
             machineId: machines["UP78-LDR-202"]._id,
             projectId: projects["PRJ-BETA-002"]._id,
-            operatorName: labours.operator2.name,
-            startDate: new Date("2026-03-05"),
+            operatorId: labours.operator2._id,
+            assignDate: new Date("2026-03-05"),
+            assignedFrom: new Date("2026-03-05"),
+            assignmentStatus: "ACTIVE",
             assignedBy: users.manager2._id,
         },
         {
             machineId: machines["UP78-TRK-303"]._id,
             projectId: projects["PRJ-GAMMA-003"]._id,
-            operatorName: null,
-            startDate: new Date("2026-05-05"),
+            operatorId: null,
+            assignDate: new Date("2026-05-05"),
+            assignedFrom: new Date("2026-05-05"),
+            assignmentStatus: "ACTIVE",
             assignedBy: users.manager1._id,
         },
     ];
 
-    for (const a of allocationDefs) {
-        await MachineAllocation.findOneAndUpdate(
-            { machineId: a.machineId, projectId: a.projectId, status: "Allocated" },
-            { $setOnInsert: { ...a, status: "Allocated" } },
+    for (const a of assignmentDefs) {
+        await MachineAssignment.findOneAndUpdate(
+            { machineId: a.machineId, projectId: a.projectId, releaseDate: null },
+            { $setOnInsert: { ...a } },
             { upsert: true, new: true }
         );
     }
-    console.log("🔗 Machines allocated to projects");
+    console.log("🔗 Machines assigned to projects");
 
     /* ======================================================================
      * 9. STOCK — material items ka quantity + project-wise balance

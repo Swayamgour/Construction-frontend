@@ -112,10 +112,13 @@ export default function LabourDashboard() {
     const total = labours.length;
     const active = labours.filter((l) => l.status === "Active").length;
     const inactive = labours.filter((l) => l.status === "Inactive").length;
-    const assigned = labours.filter((l) => l.projectAssigned || l.assignmentStatus === "Assigned").length;
+    const assigned = labours.filter((l) => l.isAssigned).length;
     const unassigned = total - assigned;
     return { total, active, inactive, assigned, unassigned };
   }, [labours]);
+
+
+  console.log(labours)
 
   // Filtered List
   const filteredLabours = useMemo(() => {
@@ -447,17 +450,15 @@ export default function LabourDashboard() {
             <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
               <button
                 onClick={() => setViewMode("table")}
-                className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
-                  viewMode === "table" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
-                }`}
+                className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${viewMode === "table" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                  }`}
               >
                 <List size={15} /> Table
               </button>
               <button
                 onClick={() => setViewMode("cards")}
-                className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
-                  viewMode === "cards" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
-                }`}
+                className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${viewMode === "cards" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                  }`}
               >
                 <LayoutGrid size={15} /> Cards
               </button>
@@ -688,11 +689,10 @@ export default function LabourDashboard() {
                         {/* Status */}
                         <td className="py-3.5 px-4 text-center">
                           <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                              labour.status === "Active"
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : "bg-rose-50 text-rose-700 border border-rose-200"
-                            }`}
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${labour.status === "Active"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-rose-50 text-rose-700 border border-rose-200"
+                              }`}
                           >
                             {labour.status}
                           </span>
@@ -720,17 +720,7 @@ export default function LabourDashboard() {
                                 <Edit size={16} />
                               </button>
                             )}
-
-                            {/* Assign (if unassigned) */}
-                            {isSuperOrAdmin && !isAssigned && labour.status === "Active" && (
-                              <button
-                                onClick={() => handleOpenAssignModal(labour)}
-                                title="Assign to Site"
-                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold transition"
-                              >
-                                <UserPlus size={13} /> Assign
-                              </button>
-                            )}
+                            {/* {console.log(isSuperOrAdmin, isAssigned, labour.status)} */}
 
                             {/* Transfer (if assigned) */}
                             {isSuperOrAdmin && isAssigned && (
@@ -759,11 +749,10 @@ export default function LabourDashboard() {
                               <button
                                 onClick={() => handleToggleStatus(labour)}
                                 title={labour.status === "Active" ? "Deactivate" : "Activate"}
-                                className={`p-1.5 rounded-lg transition ${
-                                  labour.status === "Active"
-                                    ? "text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                                    : "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
-                                }`}
+                                className={`p-1.5 rounded-lg transition ${labour.status === "Active"
+                                  ? "text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                  : "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
+                                  }`}
                               >
                                 <Power size={15} />
                               </button>
@@ -831,11 +820,10 @@ export default function LabourDashboard() {
                   setActiveTypeTab(tab);
                   setCurrentPage(1);
                 }}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
-                  activeTypeTab === tab
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                }`}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${activeTypeTab === tab
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                  }`}
               >
                 {tab}
               </button>
@@ -874,11 +862,10 @@ export default function LabourDashboard() {
                         </div>
                       </div>
                       <span
-                        className={`px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0 ${
-                          labour.status === "Active"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-rose-50 text-rose-700 border border-rose-200"
-                        }`}
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0 ${labour.status === "Active"
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-rose-50 text-rose-700 border border-rose-200"
+                          }`}
                       >
                         {labour.status}
                       </span>

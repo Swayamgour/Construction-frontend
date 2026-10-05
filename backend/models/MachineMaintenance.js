@@ -8,8 +8,12 @@ const maintenanceSchema = new mongoose.Schema({
   description: { type: String },
   vendorName: { type: String },
   billFile: { type: String },       // path/url
+  invoiceNumber: { type: String, default: "" },
   otherFiles: [String],
   cost: { type: Number, default: 0 },
+  labourCost: { type: Number, default: 0 },
+  partsCost: { type: Number, default: 0 },
+  totalCost: { type: Number, default: 0 },
   nextServiceOn: { type: Date },    // optional
 
   // ⭐ Complete maintenance tracking (additive)

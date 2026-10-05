@@ -761,24 +761,53 @@ export const Api = createApi({
             invalidatesTags: ["MachineRequest", "Machine"],
         }),
 
+        getMachineDashboardStats: build.query({
+            query: () => "machines/dashboard/stats",
+            providesTags: ["Machine", "Assignments", "Maintenance", "MachineRequest"],
+        }),
+
         dispatchMachineRequest: build.mutation({
             query: ({ id, ...body }) => ({ url: `machinery/requests/${id}/dispatch`, method: "PATCH", body }),
-            invalidatesTags: ["MachineRequest"],
+            invalidatesTags: ["MachineRequest", "Machine"],
+        }),
+
+        procureVendorMachine: build.mutation({
+            query: ({ id, ...body }) => ({ url: `machinery/requests/${id}/vendor-procure`, method: "PATCH", body }),
+            invalidatesTags: ["MachineRequest", "Machine"],
         }),
 
         receiveMachineAtSite: build.mutation({
-            query: (id) => ({ url: `machinery/requests/${id}/receive`, method: "PATCH" }),
-            invalidatesTags: ["MachineRequest", "Assignments"],
+            query: ({ id, formData, ...body }) => ({
+                url: `machinery/requests/${id}/receive`,
+                method: "PATCH",
+                body: formData || body,
+            }),
+            invalidatesTags: ["MachineRequest", "Assignments", "Machine"],
+        }),
+
+        rejectMachineAtSite: build.mutation({
+            query: ({ id, ...body }) => ({ url: `machinery/requests/${id}/site-reject`, method: "PATCH", body }),
+            invalidatesTags: ["MachineRequest", "Machine"],
+        }),
+
+        cancelMachineRequest: build.mutation({
+            query: (id) => ({ url: `machinery/requests/${id}/cancel`, method: "PATCH" }),
+            invalidatesTags: ["MachineRequest", "Machine"],
         }),
 
         releaseMachineRequest: build.mutation({
             query: (id) => ({ url: `machinery/requests/${id}/release`, method: "PATCH" }),
-            invalidatesTags: ["MachineRequest", "Assignments"],
+            invalidatesTags: ["MachineRequest", "Assignments", "Machine"],
+        }),
+
+        transferMachine: build.mutation({
+            query: (body) => ({ url: "assignments/transfer", method: "POST", body }),
+            invalidatesTags: ["Assignments", "Machine"],
         }),
 
         addMachineDocument: build.mutation({
             query: ({ id, formData }) => ({ url: `machinery/${id}/documents`, method: "POST", body: formData }),
-            invalidatesTags: ["MachineDocument"],
+            invalidatesTags: ["MachineDocument", "Machine"],
         }),
 
         getMachineDocuments: build.query({
@@ -788,7 +817,7 @@ export const Api = createApi({
 
         verifyMachineDocument: build.mutation({
             query: ({ docId, ...body }) => ({ url: `machinery/documents/${docId}/verify`, method: "PATCH", body }),
-            invalidatesTags: ["MachineDocument"],
+            invalidatesTags: ["MachineDocument", "Machine"],
         }),
 
         getExpiringMachineDocuments: build.query({
@@ -798,7 +827,7 @@ export const Api = createApi({
 
         logMachineOperatorDay: build.mutation({
             query: ({ id, ...body }) => ({ url: `machinery/${id}/operator`, method: "POST", body }),
-            invalidatesTags: ["OperatorLog"],
+            invalidatesTags: ["OperatorLog", "Machine", "Reports", "Assignments"],
         }),
 
         getMachineOperatorLogs: build.query({
@@ -1494,15 +1523,20 @@ export const {
     useReleaseMachineMutation,
     useGetActiveAssignmentsQuery,
     useGetAssignmentHistoryQuery,
+    useTransferMachineMutation,
+    useGetMachineDashboardStatsQuery,
 
     useCreateMachineRequestMutation,
     useGetMachineRequestsQuery,
     useGetMachineRequestHistoryQuery,
     useApproveMachineRequestMutation,
     useRejectMachineRequestMutation,
+    useCancelMachineRequestMutation,
     useAllocateMachineRequestMutation,
+    useProcureVendorMachineMutation,
     useDispatchMachineRequestMutation,
     useReceiveMachineAtSiteMutation,
+    useRejectMachineAtSiteMutation,
     useReleaseMachineRequestMutation,
     useAddMachineDocumentMutation,
     useGetMachineDocumentsQuery,

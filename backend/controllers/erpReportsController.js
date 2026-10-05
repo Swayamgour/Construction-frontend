@@ -68,18 +68,55 @@ export const machineryReport = async (req, res) => {
         if (machine) usageFilter.machineId = machine;
         Object.assign(usageFilter, getDateRangeFilter(req, "date"));
 
-        const [operatorLogs, total, maintenanceCosts] = await Promise.all([
-            MachineOperatorLog.find(usageFilter).populate("machineId", "machineNumber machineType").populate("operatorId", "name").sort({ date: -1 }).skip(skip).limit(limit),
+        const [operatorLogs, total, logsAgg, maintenanceCosts] = await Promise.all([
+            MachineOperatorLog.find(usageFilter)
+                .populate("machineId", "machineNumber machineType brand model hourlyRate dailyRate")
+                .populate("operatorId", "name labourId category phone")
+                .populate("projectId", "name code projectName")
+                .sort({ date: -1 })
+                .skip(skip)
+                .limit(limit),
             MachineOperatorLog.countDocuments(usageFilter),
+            MachineOperatorLog.aggregate([
+                { $match: usageFilter },
+                {
+                    $group: {
+                        _id: null,
+                        totalWorkingHours: { $sum: "$workingHours" },
+                        totalFuelConsumed: { $sum: "$fuelConsumed" },
+                        totalFuelCost: { $sum: "$fuelCost" },
+                        totalUsageCost: { $sum: "$machineUsageCost" },
+                    },
+                },
+            ]),
             MachineMaintenance.aggregate([
                 ...(machine ? [{ $match: { machineId: new mongoose.Types.ObjectId(machine) } }] : []),
-                { $group: { _id: null, totalMaintenanceCost: { $sum: "$cost" } } },
+                ...(project ? [{ $match: { projectId: new mongoose.Types.ObjectId(project) } }] : []),
+                { $group: { _id: null, totalMaintenanceCost: { $sum: { $ifNull: ["$cost", "$totalCost"] } } } },
             ]),
         ]);
 
+        const totalWorkingHours = logsAgg[0]?.totalWorkingHours || 0;
+        const totalFuelConsumed = logsAgg[0]?.totalFuelConsumed || 0;
+        const totalFuelCost = logsAgg[0]?.totalFuelCost || 0;
+        const totalUsageCost = logsAgg[0]?.totalUsageCost || 0;
+        const totalMaintenanceCost = maintenanceCosts[0]?.totalMaintenanceCost || 0;
+        const totalOperationalCost = totalUsageCost + totalFuelCost + totalMaintenanceCost;
+
         return success(
             res, 200, "Machinery report",
-            { operatorLogs, totalMaintenanceCost: maintenanceCosts[0]?.totalMaintenanceCost || 0 },
+            {
+                operatorLogs,
+                summary: {
+                    totalWorkingHours: Number(totalWorkingHours.toFixed(2)),
+                    totalFuelConsumed: Number(totalFuelConsumed.toFixed(2)),
+                    totalFuelCost: Number(totalFuelCost.toFixed(2)),
+                    totalUsageCost: Number(totalUsageCost.toFixed(2)),
+                    totalMaintenanceCost: Number(totalMaintenanceCost.toFixed(2)),
+                    totalOperationalCost: Number(totalOperationalCost.toFixed(2)),
+                },
+                totalMaintenanceCost,
+            },
             buildPagination(page, limit, total)
         );
     } catch (error) {
@@ -144,7 +181,7 @@ export const projectDashboard = async (req, res) => {
     try {
         const { projectId } = req.params;
         const LabourAssignment = (await import("../models/LabourAssignment.js")).default;
-        const MachineRequest = (await import("../models/MachineRequest.js")).default;
+        const MachineAssignment = (await import("../models/MachineAssignment.js")).default;
         const StockRequest = (await import("../models/StockRequest.js")).default;
 
         const [activeDelays, resolvedDelaysCount, latestEOD, activeLabourCount, activeMachineCount, materialShortages] = await Promise.all([
@@ -152,7 +189,7 @@ export const projectDashboard = async (req, res) => {
             ProjectDelay.countDocuments({ projectId, status: "Resolved" }),
             EODReport.findOne({ projectId }).sort({ date: -1 }),
             LabourAssignment.countDocuments({ projectId, status: "Active" }),
-            MachineRequest.countDocuments({ projectId, status: "ACTIVE" }),
+            MachineAssignment.countDocuments({ projectId, releaseDate: null, assignmentStatus: { $in: ["ACTIVE", "DISPATCHED"] } }),
             // ⭐ "materialShortages" from the follow-up audit's expected dashboard
             // shape — stock requests on this project that are still waiting
             // on material (not yet fully fulfilled) are the closest existing

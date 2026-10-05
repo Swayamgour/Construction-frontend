@@ -48,11 +48,17 @@ export const listMachineDocuments = async (req, res) => {
 export const verifyMachineDocument = async (req, res) => {
     try {
         const { verificationStatus, remarks } = req.body;
+        const updateData = { 
+            verificationStatus, 
+            remarks: remarks || "",
+            verifiedBy: req.user.id,
+            verifiedAt: new Date()
+        };
         const doc = await MachineDocument.findByIdAndUpdate(
             req.params.docId,
-            { verificationStatus, remarks },
+            updateData,
             { new: true }
-        );
+        ).populate("verifiedBy", "name role");
         if (!doc) return fail(res, 404, "Document not found");
         await logAudit({ module: "MachineDocument", entityId: doc._id, action: `status:${verificationStatus}`, performedBy: req.user.id });
         return success(res, 200, "Document verification updated", doc);

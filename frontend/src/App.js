@@ -36,8 +36,6 @@ import ProjectDetail from "./pages/ProjectDetail";
 import AddNewLabour from "./pages/AddNewLabour";
 // import LabourDetailPage from "./pages/LabourDetailPage";
 import ReportsPage from "./pages/ReportsPage";
-import MachineManageMent from "./pages/MachineManageMent";
-import MachineDetailPage from "./pages/MachineDetailPage";
 import DashboardVendor from "./pages/DashboardVendor";
 import VendorDetails from "./pages/VendorDetails";
 import Notification from "./pages/Notification";
@@ -48,7 +46,6 @@ import BudgetDashboard from "./pages/BudgetDashboard";
 import AddBOQItem from "./pages/AddBOQItem";
 import ExploreDetailedBOQ from "./pages/ExploreDetailedBOQ";
 import AddNewProject from "./pages/AddNewProject";
-import AddNewMachine from "./pages/AddNewMachine";
 import AssignTask from "./pages/AssignTask/AssignTask";
 import TaskView from "./pages/TaskView";
 import TaskList from "./pages/TaskList";
@@ -98,9 +95,8 @@ import { CheckRole } from "./helper/CheckRole";
 import MaterialRequest from "./pages/mr/MaterialRequest";
 import MaterialApproval from "./pages/mr/MaterialApproval";
 import MachineList from "./pages/Machines/MachineList";
+import MachineDashboard from "./pages/Machines/MachineDashboard";
 import AddEditMachine from "./pages/Machines/AddEditMachine";
-import MachineAllocation from "./pages/Machines/MachineAllocation";
-import MachineUsage from "./pages/Machines/MachineUsage";
 import ProjectAttendancePage from "./pages/Attendence/ProjectAttendancePage";
 import PendingAttendancePage from "./pages/Attendence/PendingAttendancePage";
 import AttendanceLabour from "./pages/AttendanceLabour";
@@ -425,22 +421,6 @@ function App() {
           }
         />
         <Route
-          path="/MachineManageMent"
-          element={
-            <Layout>
-              <MachineManageMent />
-            </Layout>
-          }
-        />
-        <Route
-          path="/MachineDetailPage"
-          element={
-            <Layout>
-              <MachineDetailPage />
-            </Layout>
-          }
-        />
-        <Route
           path="/VendorManagement"
           element={
             <Layout>
@@ -543,14 +523,6 @@ function App() {
           element={
             <Layout>
               <AddNewProject />
-            </Layout>
-          }
-        />
-        <Route
-          path="/AddNewMachine"
-          element={
-            <Layout>
-              <AddNewMachine />
             </Layout>
           }
         />
@@ -776,20 +748,6 @@ function App() {
 
         } />
 
-        <Route path="/machine-allocation" element={<Layout>
-          <MachineAllocation />
-        </Layout>
-
-        } />
-
-        <Route path="/machine-usage" element={<Layout>
-          <MachineUsage />
-        </Layout>
-
-
-
-        } />
-
 
 
         <Route
@@ -954,6 +912,10 @@ function App() {
         } />
 
 
+        <Route path="/machine/dashboard" element={<Layout>
+          <MachineDashboard />
+        </Layout>
+        } />
         <Route path="/machine/list" element={<Layout>
           <MachineList />
         </Layout>

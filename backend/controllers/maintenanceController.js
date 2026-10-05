@@ -1,6 +1,6 @@
 import MachineMaintenance from "../models/MachineMaintenance.js";
 import Machine from "../models/Machine.js";
-import DailyUsage from "../models/DailyUsage.js";
+import MachineAssignment from "../models/MachineAssignment.js";
 import { uploadToCloudinary } from "../utils/cloudUpload.js";
 import { success, fail, getPagination, buildPagination, getDateRangeFilter } from "../utils/apiResponse.js";
 import { logAudit } from "../utils/audit.js";
@@ -8,20 +8,34 @@ import { notifyRoles } from "../utils/notify.js";
 
 export const addMaintenance = async (req, res) => {
   try {
-    const { machineId, serviceDate, serviceType, description, vendorName, cost, nextServiceOn } = req.body;
+    const { machineId, serviceDate, serviceType, description, vendorName, cost, labourCost, partsCost, nextServiceOn } = req.body;
     if (!machineId || !serviceDate || !serviceType) return res.status(400).json({ message: "Required fields missing" });
 
+    const totalCost = (Number(cost) || 0) + (Number(labourCost) || 0) + (Number(partsCost) || 0);
+
     const doc = {
-      machineId, serviceDate: new Date(serviceDate), serviceType, description, vendorName,
-      cost: cost ? Number(cost) : 0, nextServiceOn: nextServiceOn ? new Date(nextServiceOn) : null,
+      machineId,
+      serviceDate: new Date(serviceDate),
+      serviceType,
+      description,
+      vendorName,
+      cost: Number(cost) || totalCost,
+      labourCost: Number(labourCost) || 0,
+      partsCost: Number(partsCost) || 0,
+      totalCost,
+      nextServiceOn: nextServiceOn ? new Date(nextServiceOn) : null,
       billFile: req.file?.path || null,
-      createdBy: req.user?._id || null
+      createdBy: req.user?._id || null,
+      status: "Scheduled",
     };
     const rec = await MachineMaintenance.create(doc);
 
-    // optional: update machine nextService reminder field (if you want)
-    if (doc.nextServiceOn) {
-      await Machine.findByIdAndUpdate(machineId, { $set: { nextServiceOn: doc.nextServiceOn } });
+    // Update machine status to Under Maintenance
+    const machine = await Machine.findById(machineId);
+    if (machine) {
+      if (doc.nextServiceOn) machine.nextServiceOn = doc.nextServiceOn;
+      machine.status = "Under Maintenance";
+      await machine.save();
     }
 
     res.status(201).json({ message: "Maintenance added", maintenance: rec });
@@ -33,7 +47,10 @@ export const addMaintenance = async (req, res) => {
 export const getMaintenanceHistory = async (req, res) => {
   try {
     const { machineId } = req.params;
-    const history = await MachineMaintenance.find({ machineId }).sort({ serviceDate: -1 });
+    const history = await MachineMaintenance.find({ machineId })
+      .populate("reportedBy", "name role")
+      .populate("projectId", "name code")
+      .sort({ serviceDate: -1 });
     res.json({ message: "History", history });
   } catch (err) {
     res.status(500).json({ message: "Error", error: err.message });
@@ -42,17 +59,28 @@ export const getMaintenanceHistory = async (req, res) => {
 
 /**
  * POST /api/machinery/:id/maintenance
- * Full maintenance record: issue reporting, before/after images, parts
- * used, meter reading, and next-maintenance-due tracking. Additive
- * sibling to addMaintenance() above (which stays for backward
- * compatibility with any existing caller of POST /api/machines/maintenance/add).
+ * Full maintenance record: breakdown / preventive / emergency / scheduled service.
+ * Updates machine status to Breakdown or Under Maintenance.
  */
 export const reportMaintenance = async (req, res) => {
   try {
     const {
-      projectId, maintenanceType, issue, description, reportedDate, serviceDate,
-      serviceProvider, cost, partsUsed, nextMaintenanceDate, machineMeterReading,
-      nextServiceMeterReading, status,
+      projectId,
+      maintenanceType,
+      issue,
+      description,
+      reportedDate,
+      serviceDate,
+      serviceProvider,
+      cost,
+      labourCost,
+      partsCost,
+      partsUsed,
+      nextMaintenanceDate,
+      machineMeterReading,
+      nextServiceMeterReading,
+      status,
+      invoiceNumber,
     } = req.body;
 
     const machineId = req.params.id;
@@ -70,6 +98,8 @@ export const reportMaintenance = async (req, res) => {
     let billFile = null;
     if (req.files?.invoice?.[0]) billFile = await uploadToCloudinary(req.files.invoice[0], "machine/maintenance/invoices");
 
+    const calculatedTotalCost = (Number(cost) || 0) + (Number(labourCost) || 0) + (Number(partsCost) || 0);
+
     const record = await MachineMaintenance.create({
       machineId,
       projectId: projectId || null,
@@ -81,18 +111,34 @@ export const reportMaintenance = async (req, res) => {
       reportedDate: reportedDate ? new Date(reportedDate) : new Date(),
       reportedBy: req.user.id,
       serviceProvider: serviceProvider || "",
-      cost: cost ? Number(cost) : 0,
-      partsUsed: partsUsed ? JSON.parse(partsUsed) : [],
+      cost: Number(cost) || calculatedTotalCost,
+      labourCost: Number(labourCost) || 0,
+      partsCost: Number(partsCost) || 0,
+      totalCost: calculatedTotalCost,
+      invoiceNumber: invoiceNumber || "",
+      partsUsed: partsUsed ? (typeof partsUsed === "string" ? JSON.parse(partsUsed) : partsUsed) : [],
       billFile,
       beforeImages,
       afterImages,
       nextMaintenanceDate: nextMaintenanceDate || null,
       nextServiceOn: nextMaintenanceDate || null,
-      machineMeterReading: machineMeterReading ?? null,
-      nextServiceMeterReading: nextServiceMeterReading ?? null,
+      machineMeterReading: machineMeterReading !== undefined ? Number(machineMeterReading) : machine.currentMeterReading || null,
+      nextServiceMeterReading: nextServiceMeterReading !== undefined ? Number(nextServiceMeterReading) : null,
       status: status || "Reported",
       createdBy: req.user.id,
     });
+
+    // Sync Machine status
+    if (["Reported", "Scheduled", "InProgress"].includes(record.status)) {
+      if (maintenanceType === "breakdown" || maintenanceType === "emergency") {
+        machine.status = "Breakdown";
+      } else {
+        machine.status = "Under Maintenance";
+      }
+      if (nextServiceMeterReading) machine.nextServiceMeter = Number(nextServiceMeterReading);
+      if (nextMaintenanceDate) machine.nextServiceOn = new Date(nextMaintenanceDate);
+      await machine.save();
+    }
 
     await logAudit({ module: "MachineMaintenance", entityId: record._id, action: "reported", performedBy: req.user.id, meta: { maintenanceType } });
     await notifyRoles({ roles: ["admin", "manager"], projectId: projectId || null, title: "Machine maintenance reported", message: `${machine.machineNumber}: ${issue || maintenanceType}`, module: "Machinery", referenceType: "MachineMaintenance", referenceId: record._id });
@@ -106,7 +152,7 @@ export const reportMaintenance = async (req, res) => {
 /** PATCH /api/machinery/maintenance/:id/status */
 export const updateMaintenanceStatus = async (req, res) => {
   try {
-    const { status, cost, nextMaintenanceDate } = req.body;
+    const { status, cost, nextMaintenanceDate, nextServiceMeterReading } = req.body;
     const record = await MachineMaintenance.findById(req.params.id);
     if (!record) return fail(res, 404, "Maintenance record not found");
 
@@ -116,7 +162,31 @@ export const updateMaintenanceStatus = async (req, res) => {
       record.nextMaintenanceDate = nextMaintenanceDate;
       record.nextServiceOn = nextMaintenanceDate;
     }
+    if (nextServiceMeterReading !== undefined) {
+      record.nextServiceMeterReading = Number(nextServiceMeterReading);
+    }
     await record.save();
+
+    // Check if machine status should be restored
+    const machine = await Machine.findById(record.machineId);
+    if (machine) {
+      if (["Completed", "Cancelled"].includes(record.status)) {
+        // If completed or cancelled, check if there is an active assignment
+        const activeAssignment = await MachineAssignment.findOne({
+          machineId: record.machineId,
+          releaseDate: null,
+          assignmentStatus: { $in: ["ACTIVE", "DISPATCHED"] },
+        });
+
+        machine.status = activeAssignment ? "Assigned" : "Available";
+        if (record.nextMaintenanceDate) machine.nextServiceOn = record.nextMaintenanceDate;
+        if (record.nextServiceMeterReading) machine.nextServiceMeter = record.nextServiceMeterReading;
+        await machine.save();
+      } else if (["Reported", "InProgress", "Scheduled"].includes(record.status)) {
+        machine.status = record.maintenanceType === "breakdown" ? "Breakdown" : "Under Maintenance";
+        await machine.save();
+      }
+    }
 
     await logAudit({ module: "MachineMaintenance", entityId: record._id, action: `status:${record.status}`, performedBy: req.user.id });
     return success(res, 200, "Maintenance record updated", record);
@@ -125,7 +195,7 @@ export const updateMaintenanceStatus = async (req, res) => {
   }
 };
 
-/** GET /api/machinery/maintenance/upcoming?days=15 — due by nextMaintenanceDate. */
+/** GET /api/machinery/maintenance/upcoming?days=15 — due by date. */
 export const getUpcomingMaintenance = async (req, res) => {
   try {
     const days = Number(req.query.days) || 15;
@@ -137,7 +207,7 @@ export const getUpcomingMaintenance = async (req, res) => {
       status: { $ne: "Completed" },
       $or: [{ nextMaintenanceDate: { $gte: today, $lte: until } }, { nextServiceOn: { $gte: today, $lte: until } }],
     })
-      .populate("machineId", "machineNumber machineType")
+      .populate("machineId", "machineNumber machineType brand model status")
       .sort({ nextMaintenanceDate: 1 });
 
     return success(res, 200, "Upcoming maintenance fetched", upcoming);
@@ -148,56 +218,31 @@ export const getUpcomingMaintenance = async (req, res) => {
 
 /**
  * GET /api/machinery/maintenance/meter-due
- * Meter/hour-based maintenance due detection — the piece the follow-up
- * audit flagged as missing. Real "current meter hours" isn't stored
- * anywhere as a live field, so it's derived: (meter reading at the
- * machine's last completed service) + (sum of DailyUsage.hoursRun logged
- * since that service date). A machine is flagged once its derived
- * current reading is within `bufferHours` of, or past,
- * nextServiceMeterReading.
+ * Meter/hour-based maintenance due detection using cumulative Machine meter.
  */
 export const getMeterBasedMaintenanceDue = async (req, res) => {
   try {
     const bufferHours = Number(req.query.bufferHours) || 200;
 
-    // One most-recent record per machine that actually set a meter-based
-    // threshold — that's the baseline to project forward from.
-    const latestWithThreshold = await MachineMaintenance.aggregate([
-      { $match: { nextServiceMeterReading: { $ne: null } } },
-      { $sort: { serviceDate: -1 } },
-      {
-        $group: {
-          _id: "$machineId",
-          maintenanceId: { $first: "$_id" },
-          serviceDate: { $first: "$serviceDate" },
-          machineMeterReading: { $first: "$machineMeterReading" },
-          nextServiceMeterReading: { $first: "$nextServiceMeterReading" },
-        },
-      },
-    ]);
+    // Fetch machines that have a nextServiceMeter configured
+    const machinesWithMeterService = await Machine.find({
+      nextServiceMeter: { $ne: null, $gt: 0 },
+      active: true,
+    });
 
     const due = [];
-    for (const rec of latestWithThreshold) {
-      const usageSince = await DailyUsage.aggregate([
-        { $match: { machineId: rec._id, date: { $gt: rec.serviceDate } } },
-        { $group: { _id: null, totalHours: { $sum: "$hoursRun" } } },
-      ]);
-      const hoursSinceService = usageSince[0]?.totalHours || 0;
-      const currentMeter = (rec.machineMeterReading || 0) + hoursSinceService;
-      const remaining = rec.nextServiceMeterReading - currentMeter;
+    for (const machine of machinesWithMeterService) {
+      const currentMeter = machine.currentMeterReading || 0;
+      const targetMeter = machine.nextServiceMeter;
+      const remaining = targetMeter - currentMeter;
 
       if (remaining <= bufferHours) {
-        const machine = await Machine.findById(rec._id).select("machineNumber machineType");
         due.push({
-          machineId: rec._id,
+          machineId: machine._id,
           machine,
-          lastMaintenanceId: rec.maintenanceId,
-          lastServiceDate: rec.serviceDate,
-          meterAtLastService: rec.machineMeterReading || 0,
-          hoursRunSinceService: hoursSinceService,
-          estimatedCurrentMeter: currentMeter,
-          nextServiceMeterReading: rec.nextServiceMeterReading,
-          hoursRemaining: remaining,
+          currentMeter,
+          nextServiceMeterReading: targetMeter,
+          hoursRemaining: Number(remaining.toFixed(2)),
           status: remaining <= 0 ? "Overdue" : "Due Soon",
         });
       }
@@ -219,7 +264,12 @@ export const getFullMaintenanceHistory = async (req, res) => {
     Object.assign(filter, getDateRangeFilter(req, "serviceDate"));
 
     const [items, total] = await Promise.all([
-      MachineMaintenance.find(filter).sort({ serviceDate: -1 }).skip(skip).limit(limit),
+      MachineMaintenance.find(filter)
+        .populate("reportedBy", "name role")
+        .populate("projectId", "name code")
+        .sort({ serviceDate: -1 })
+        .skip(skip)
+        .limit(limit),
       MachineMaintenance.countDocuments(filter),
     ]);
 
@@ -228,3 +278,4 @@ export const getFullMaintenanceHistory = async (req, res) => {
     return fail(res, 500, "Error fetching maintenance history", err);
   }
 };
+

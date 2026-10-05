@@ -17,8 +17,6 @@ import itemRoutes from "./routes/itemRoutes.js";
 import materialRequestRoutes from "./routes/materialRequestRoutes.js";
 import labourRoutes from "./routes/labourRoutes.js";
 import machineRoutes from "./routes/machineRoutes.js";
-import machineAllocationRoutes from "./routes/machineAllocationRoutes.js";
-import machineUsageRoutes from "./routes/machineUsageRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import grnRoutes from "./routes/grnRoutes.js";
@@ -107,10 +105,6 @@ app.use("/api/mr", materialRequestRoutes);
 app.use("/api/attendance", attendanceRoutes);
 
 app.use("/api/labour", labourManagementRoutes);
-
-app.use("/api/machine/allocation", machineAllocationRoutes);
-
-app.use("/api/machine/usage", machineUsageRoutes);
 
 app.use("/api/task", taskRoutes);
 

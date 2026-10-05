@@ -1,26 +1,38 @@
-// Backend origin (WITHOUT /api). Files are served by express.static("/uploads").
-// Vite: add VITE_BACKEND_URL=http://localhost:5000 in .env
-// (CRA users: replace import.meta.env.VITE_BACKEND_URL with process.env.REACT_APP_BACKEND_URL)
-const BASE_URL = (
-    import.meta.env?.VITE_BACKEND_URL || "http://localhost:5002"
-).replace(/\/$/, "");
+let backendUrl = "https://backendapi.ssconstructionsup.in";
+// let backendUrl = "http://localhost:5002";
+
+
+try {
+    if (typeof process !== "undefined" && process.env?.REACT_APP_BACKEND_URL) {
+        backendUrl = process.env.REACT_APP_BACKEND_URL;
+    }
+} catch (_) { }
+
+const BASE_URL = backendUrl.replace(/\/$/, "");
 
 /**
  * DB stores "/uploads/projects/field/name.png".
- * Old Cloudinary records store full "https://..." URLs, so keep those as-is.
+ * Cloudinary records store full "https://..." URLs, so keep those as-is.
  */
 export const getFileUrl = (path) => {
     if (!path || typeof path !== "string") return "";
 
-    const clean = path.replace(/\\/g, "/");
+    const clean = path.replace(/\\/g, "/").trim();
 
     if (/^https?:\/\//i.test(clean)) return clean;
 
     return `${BASE_URL}${clean.startsWith("/") ? "" : "/"}${clean}`;
 };
 
-export const isImageFile = (path) =>
-    /\.(png|jpe?g|gif|webp|bmp|svg|avif)(\?.*)?$/i.test(path || "");
+export const isImageFile = (path) => {
+    if (!path || typeof path !== "string") return false;
+    if (/\.(png|jpe?g|gif|webp|bmp|svg|avif)(\?.*)?$/i.test(path)) return true;
+    if (path.includes("/image/upload/")) return true;
+    return false;
+};
+
+export const isPdfFile = (path) =>
+    /\.(pdf)(\?.*)?$/i.test(path || "");
 
 export const getFileName = (path) =>
     decodeURIComponent((path || "").split("/").pop() || "file");
