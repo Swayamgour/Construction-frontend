@@ -78,7 +78,8 @@ const inputCls =
 
 const StockRequests = () => {
   const { role: userRole } = CheckRole();
-  const isAdmin = userRole === "admin";
+  const currentRole = String(userRole || "").toLowerCase();
+  const isAdmin = currentRole === "admin";
 
   const [showCreate, setShowCreate] = useState(false);
   const [fulfilModal, setFulfilModal] = useState(null); // { request, type: 'transfer' | 'procurement' }
@@ -399,7 +400,7 @@ const StockRequests = () => {
                     : "bg-blue-50 text-blue-700 border-blue-200"
                 }`}
               >
-                {isAdmin ? "Admin Panel" : userRole === "supervisor" ? "Site Supervisor" : "Manager Operations"}
+                {isAdmin ? "Admin Panel" : currentRole === "supervisor" ? "Site Supervisor" : "Manager Operations"}
               </span>
             </div>
             <p className="text-xs text-gray-500 mt-0.5">

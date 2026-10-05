@@ -32,6 +32,12 @@ const PAGE_TITLES = {
   "/drawings": "Drawings",
   "/eod-reports": "EOD Reports",
   "/project-delays": "Project Delays",
+  "/stock/requests": "Material Requests",
+  "/stock/operations": "Inventory & Stock Operations",
+  "/purchase-orders": "Purchase Orders",
+  "/consumption": "Stock Consumption",
+  "/employee/pending": "Approve Attendance",
+  "/audit-log": "Audit Log",
   "/ViewUser": "User & Roles",
   "/Profile": "My Profile",
 };
@@ -72,7 +78,13 @@ const Header = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, role, us
   const notifications = notifResp?.data?.items || [];
   const unreadCount = notifResp?.data?.unreadCount || 0;
 
-  const pageTitle = PAGE_TITLES[location.pathname] || prettify(location.pathname);
+  const currentRole = String(role || "").toLowerCase();
+  const pageTitle =
+    location.pathname === "/stock/requests"
+      ? currentRole === "admin"
+        ? "Material Approvals"
+        : "Material Requests"
+      : PAGE_TITLES[location.pathname] || prettify(location.pathname);
 
   useEffect(() => {
     const handleClickOutside = (e) => {

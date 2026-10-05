@@ -1,16 +1,18 @@
-import { useUserDetailQuery } from "../Reduxe/Api";
+import { useUserDetailQuery, useCheckLoginQuery } from "../Reduxe/Api";
 
 export const CheckRole = () => {
+    const { data: userDetail, isLoading: loading1, isError: err1 } = useUserDetailQuery();
+    const { data: checkLogin } = useCheckLoginQuery();
 
-    const { data, isLoading, isError } = useUserDetailQuery();
-
-    console.log("data", data);
+    const user = userDetail?.user || checkLogin?.user;
+    const rawRole = user?.role || "";
+    const role = String(rawRole).toLowerCase();
 
     return {
-        role: data?.user?.role,
-        user: data?.user,
-        isLoading,
-        isError
+        role,
+        user,
+        isLoading: loading1 && !user,
+        isError: err1
     };
 };
 

@@ -143,6 +143,7 @@ const PODetailModal = ({ id, onClose }) => {
 const PurchaseOrderPage = () => {
     const navigate = useNavigate();
     const { role } = CheckRole();
+    const currentRole = String(role || "").toLowerCase();
     const [detailId, setDetailId] = useState(null);
 
     const [projectId, setProjectId] = useState("");
@@ -203,13 +204,22 @@ const PurchaseOrderPage = () => {
     return (
         <div className="p-6 bg-gray-50 min-h-screen">
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-semibold">Purchase Order</h1>
-                <button
-                    onClick={() => navigate("/PurchaseOrder")}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-                >
-                    + Create Purchase Order
-                </button>
+                <div>
+                    <h1 className="text-2xl font-semibold">Purchase Orders</h1>
+                    <p className="text-xs text-gray-500 mt-1">
+                        {currentRole === "admin"
+                            ? "Enterprise procurement, vendor orders, and financial approvals."
+                            : "Site purchase orders and vendor supply tracking."}
+                    </p>
+                </div>
+                {(currentRole === "admin" || currentRole === "manager") && (
+                    <button
+                        onClick={() => navigate("/PurchaseOrder")}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm"
+                    >
+                        + Create Purchase Order
+                    </button>
+                )}
             </div>
 
             {/* Filters */}
@@ -286,7 +296,7 @@ const PurchaseOrderPage = () => {
                         {orders.map((po) => {
                             const allowedTargets = TRANSITIONS[po.status] || [];
                             const visibleActions = ACTIONS.filter(
-                                (a) => allowedTargets.includes(a.to) && a.roles.includes(role)
+                                (a) => allowedTargets.includes(a.to) && a.roles.map((r) => r.toLowerCase()).includes(currentRole)
                             );
                             return (
                                 <tr key={po._id} className="border-t hover:bg-gray-50 transition-colors duration-150">

@@ -62,8 +62,8 @@ router.post(
     "/requests",
     auth,
     roleCheck("admin", "manager", "supervisor"),
-    checkProjectAccess(),
     uploadValidated.fields([{ name: "attachments", maxCount: 4 }]),
+    checkProjectAccess(),
     createMachineRequest
 );
 router.get("/requests", auth, roleCheck("admin", "manager", "supervisor"), listMachineRequests);

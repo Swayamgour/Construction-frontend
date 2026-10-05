@@ -840,17 +840,59 @@ const StockOperations = () => {
     handleTabChange("ledger");
   };
 
+  const currentRole = String(role || "").toLowerCase();
+
+  const visibleTabs = React.useMemo(() => {
+    if (currentRole === "supervisor") {
+      return TABS.filter((t) => ["inventory", "receipts"].includes(t.key));
+    }
+    return TABS;
+  }, [currentRole]);
+
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto min-h-screen pb-20">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 flex items-center justify-center text-white shadow-md shadow-indigo-900/20">
+          <div
+            className={`w-11 h-11 rounded-xl flex items-center justify-center text-white shadow-md ${
+              currentRole === "admin"
+                ? "bg-gradient-to-br from-purple-600 to-indigo-700 shadow-purple-900/20"
+                : "bg-gradient-to-br from-indigo-600 to-blue-600 shadow-indigo-900/20"
+            }`}
+          >
             <Boxes size={20} />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Inventory & Stock Management</h1>
-            <p className="text-xs text-slate-500">Live project balances, inter-site transfers, receiving, and audit ledger.</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+                {currentRole === "admin"
+                  ? "Central Stock & Inventory Management"
+                  : currentRole === "supervisor"
+                  ? "Site Inventory & Goods Receipt"
+                  : "Project Stock & Inventory"}
+              </h1>
+              <span
+                className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                  currentRole === "admin"
+                    ? "bg-purple-50 text-purple-700 border-purple-200"
+                    : currentRole === "supervisor"
+                    ? "bg-teal-50 text-teal-700 border-teal-200"
+                    : "bg-blue-50 text-blue-700 border-blue-200"
+                }`}
+              >
+                {currentRole === "admin"
+                  ? "Admin Central View"
+                  : currentRole === "supervisor"
+                  ? "Site Supervisor"
+                  : "Manager Project View"}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {currentRole === "admin"
+                ? "Live enterprise inventory, godown stock, inter-project transfers, and complete audit trail."
+                : "Live site material balances, delivery receipts, site ledger, and damage records."}
+            </p>
           </div>
         </div>
 
@@ -875,7 +917,7 @@ const StockOperations = () => {
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-200 pb-2">
-        {TABS.map((t) => {
+        {visibleTabs.map((t) => {
           const Icon = t.icon;
           return (
             <button

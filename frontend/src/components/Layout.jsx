@@ -86,6 +86,8 @@ const Layout = ({ children }) => {
         collapsed={collapsed}
         setCollapsed={setCollapsed}
         data={data}
+        role={role}
+        user={user}
       />
 
       <div className="flex-1 flex flex-col min-w-0">

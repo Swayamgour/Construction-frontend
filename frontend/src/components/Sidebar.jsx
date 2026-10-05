@@ -11,6 +11,7 @@ import {
 import toast from "react-hot-toast";
 import { APP_NAME } from "../config/brand";
 import { getInitials, getAvatarGradient } from "../helper/avatar";
+import CheckRole from "../helper/CheckRole";
 
 // ⚡ ROLE-BASED NAV — grouped into sections so the sidebar reads like a
 // menu instead of a flat wall of links. `roles` is preserved exactly
@@ -59,8 +60,9 @@ const NAV_GROUPS = [
       { name: "Material Requests", icon: ClipboardList, path: "/stock/requests", roles: ["manager", "storekeeper"] },
       { name: "Site Requests", icon: ClipboardList, path: "/stock/requests", roles: ["supervisor"] },
       { name: "Purchase Orders", icon: Store, path: "/purchase-orders", roles: ["admin", "manager", "storekeeper"] },
-      { name: "Goods Receipts (GRN)", icon: Boxes, path: "/stock/operations?tab=receipts", roles: ["admin", "manager", "storekeeper"] },
-      { name: "Inventory & Ledger", icon: Boxes, path: "/stock/operations", roles: ["admin", "manager", "storekeeper"] },
+      { name: "Goods Receipts (GRN)", icon: Boxes, path: "/stock/operations?tab=receipts", roles: ["admin", "manager", "storekeeper", "supervisor"] },
+      { name: "Central Stock & Ledger", icon: Boxes, path: "/stock/operations", roles: ["admin"] },
+      { name: "Inventory & Ledger", icon: Boxes, path: "/stock/operations", roles: ["manager", "storekeeper"] },
       { name: "Site Inventory", icon: Boxes, path: "/stock/operations", roles: ["supervisor"] },
       { name: "Stock Consumption", icon: ArrowRightLeft, path: "/consumption", roles: ["manager", "supervisor"] },
     ],
@@ -92,7 +94,7 @@ const NAV_GROUPS = [
     label: "Administration",
     items: [
       { name: "Create Role", icon: UserPlus, path: "/ViewUser", roles: ["admin"] },
-      { name: "Audit Log", icon: ShieldCheck, path: "/audit-log", roles: ["admin", "manager"] },
+      { name: "Audit Log", icon: ShieldCheck, path: "/audit-log", roles: ["admin"] },
     ],
   },
 ];
@@ -105,11 +107,12 @@ const ROLE_STYLES = {
   drawing_manager: "bg-pink-500/15 text-pink-300 border-pink-500/30",
 };
 
-const Sidebar = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, data }) => {
+const Sidebar = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, data, role: propRole, user: propUser }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const userRole = data?.user?.role;
-  const userName = data?.user?.name;
+  const { role: helperRole, user: helperUser } = CheckRole();
+  const userRole = (propRole || data?.user?.role || helperRole || "").toLowerCase();
+  const userName = propUser?.name || data?.user?.name || helperUser?.name || "User";
 
   // which groups are expanded — default: the group containing the
   // current route is open, rest closed, so the nav stays scannable.
@@ -123,7 +126,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, collapsed, setCollapsed, data })
   const visibleGroups = useMemo(
     () =>
       NAV_GROUPS
-        .map((grp) => ({ ...grp, items: grp.items.filter((it) => it.roles.includes(userRole)) }))
+        .map((grp) => ({
+          ...grp,
+          items: grp.items.filter((it) =>
+            it.roles.map((r) => r.toLowerCase()).includes(userRole)
+          ),
+        }))
         .filter((grp) => grp.items.length > 0),
     [userRole]
   );

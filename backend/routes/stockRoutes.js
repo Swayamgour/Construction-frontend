@@ -58,8 +58,8 @@ router.post(
   "/requests",
   auth,
   roleCheck("admin", "manager", "supervisor"),
-  checkProjectAccess(),
   uploadValidated.fields([{ name: "images", maxCount: 6 }, { name: "attachments", maxCount: 4 }]),
+  checkProjectAccess(),
   createStockRequest
 );
 router.get("/requests", auth, roleCheck("admin", "manager", "supervisor", "storekeeper"), listStockRequests);

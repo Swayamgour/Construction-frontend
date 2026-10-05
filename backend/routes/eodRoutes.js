@@ -19,7 +19,7 @@ const router = express.Router();
 // own _id — resolve its projectId before checking access.
 const eodProject = resolveProjectFrom(EODReport, { param: "id", field: "projectId" });
 
-router.post("/", auth, roleCheck("admin", "manager", "supervisor"), checkProjectAccess(), uploadValidated.fields([{ name: "images", maxCount: 20 }]), submitEOD);
+router.post("/", auth, roleCheck("admin", "manager", "supervisor"), uploadValidated.fields([{ name: "images", maxCount: 20 }]), checkProjectAccess(), submitEOD);
 router.get("/", auth, roleCheck("admin", "manager", "supervisor"), listEODReports);
 router.get("/:id", auth, roleCheck("admin", "manager", "supervisor"), checkProjectAccess(eodProject), getEODReport);
 router.patch("/:id", auth, roleCheck("admin", "manager", "supervisor"), checkProjectAccess(eodProject), uploadValidated.fields([{ name: "images", maxCount: 20 }]), updateEODReport);
