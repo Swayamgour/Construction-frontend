@@ -20,9 +20,11 @@ import {
     useGetVendorsQuery,
 } from "../../Reduxe/Api";
 
+import { getMachinePermissions } from "../../helper/machinePermissions";
+
 const MachineRequests = () => {
     const { role: userRole } = CheckRole();
-    const canManage = ["admin", "manager"].includes(userRole);
+    const permissions = getMachinePermissions(userRole);
 
     const [showCreate, setShowCreate] = useState(false);
     const [allocateModal, setAllocateModal] = useState(null);
@@ -81,7 +83,7 @@ const MachineRequests = () => {
         contractEnd: "",
         securityDeposit: "",
         transportCost: "",
-        operatorProvidedBy: "VENDOR",
+        operatorProvidedBy: "Vendor",
         vendorRemarks: "",
     });
 
@@ -276,7 +278,7 @@ const MachineRequests = () => {
                     case "ADMIN_REVIEW":
                         return (
                             <div className="flex flex-wrap gap-1.5">
-                                {canManage && (
+                                {permissions.canApproveRequest && (
                                     <>
                                         <button
                                             onClick={() => act(approve, row._id, "Request Approved")}
@@ -292,120 +294,155 @@ const MachineRequests = () => {
                                         </button>
                                     </>
                                 )}
-                                <button
-                                    onClick={() => act(cancelRequest, row._id, "Request Cancelled")}
-                                    className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold"
-                                >
-                                    Cancel
-                                </button>
+                                {permissions.canCancelRequest && (
+                                    <button
+                                        onClick={() => act(cancelRequest, row._id, "Request Cancelled")}
+                                        className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold"
+                                    >
+                                        Cancel
+                                    </button>
+                                )}
                             </div>
                         );
                     case "APPROVED":
                         return (
-                            <div className="flex flex-wrap gap-1.5">
-                                {canManage && (
-                                    <>
-                                        <button
-                                            onClick={() => setAllocateModal(row)}
-                                            className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold"
-                                        >
-                                            Allocate Internal
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setVendorForm({
-                                                    vendorId: "",
-                                                    vendorMachineNumber: "",
-                                                    rentalRate: "",
-                                                    rateType: "PER_DAY",
-                                                    contractStart: row.requiredFromDate ? row.requiredFromDate.slice(0, 10) : "",
-                                                    contractEnd: row.requiredToDate ? row.requiredToDate.slice(0, 10) : "",
-                                                    securityDeposit: "",
-                                                    transportCost: "",
-                                                    operatorProvidedBy: "VENDOR",
-                                                    vendorRemarks: "",
-                                                });
-                                                setVendorModal(row);
-                                            }}
-                                            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold"
-                                        >
-                                            Procure Vendor
-                                        </button>
-                                    </>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                {permissions.canAllocateMachine && (
+                                    <button
+                                        onClick={() => setAllocateModal(row)}
+                                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold"
+                                    >
+                                        Allocate Internal
+                                    </button>
                                 )}
-                                <button
-                                    onClick={() => act(cancelRequest, row._id, "Request Cancelled")}
-                                    className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold"
-                                >
-                                    Cancel
-                                </button>
+                                {permissions.canProcureVendor && (
+                                    <button
+                                        onClick={() => {
+                                            setVendorForm({
+                                                vendorId: "",
+                                                vendorMachineNumber: "",
+                                                rentalRate: "",
+                                                rateType: "PER_DAY",
+                                                contractStart: row.requiredFromDate ? row.requiredFromDate.slice(0, 10) : "",
+                                                contractEnd: row.requiredToDate ? row.requiredToDate.slice(0, 10) : "",
+                                                securityDeposit: "",
+                                                transportCost: "",
+                                                operatorProvidedBy: "Vendor",
+                                                vendorRemarks: "",
+                                            });
+                                            setVendorModal(row);
+                                        }}
+                                        className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold"
+                                    >
+                                        Procure Vendor
+                                    </button>
+                                )}
+                                {permissions.canCancelRequest && (
+                                    <button
+                                        onClick={() => act(cancelRequest, row._id, "Request Cancelled")}
+                                        className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold"
+                                    >
+                                        Cancel
+                                    </button>
+                                )}
+                                {permissions.isAdmin && (
+                                    <span className="text-[11px] font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                        Approved • Awaiting Manager Allocation
+                                    </span>
+                                )}
                             </div>
                         );
                     case "ALLOCATED":
                         return (
-                            <div className="flex flex-wrap gap-1.5">
-                                <button
-                                    onClick={() => {
-                                        setDispatchForm({
-                                            expectedSiteArrival: "",
-                                            transportDetails: "",
-                                            driverName: "",
-                                            driverPhone: "",
-                                            vehicleNumber: "",
-                                            remarks: "",
-                                        });
-                                        setDispatchModal(row);
-                                    }}
-                                    className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold"
-                                >
-                                    Dispatch
-                                </button>
-                                <button
-                                    onClick={() => act(cancelRequest, row._id, "Request Cancelled")}
-                                    className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold"
-                                >
-                                    Cancel
-                                </button>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                {permissions.canDispatchMachine && (
+                                    <button
+                                        onClick={() => {
+                                            setDispatchForm({
+                                                expectedSiteArrival: "",
+                                                transportDetails: "",
+                                                driverName: "",
+                                                driverPhone: "",
+                                                vehicleNumber: "",
+                                                remarks: "",
+                                            });
+                                            setDispatchModal(row);
+                                        }}
+                                        className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold"
+                                    >
+                                        Dispatch
+                                    </button>
+                                )}
+                                {permissions.canCancelRequest && (
+                                    <button
+                                        onClick={() => act(cancelRequest, row._id, "Request Cancelled")}
+                                        className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold"
+                                    >
+                                        Cancel
+                                    </button>
+                                )}
+                                {permissions.isAdmin && (
+                                    <span className="text-[11px] font-medium text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                                        Allocated • Awaiting Dispatch
+                                    </span>
+                                )}
                             </div>
                         );
                     case "DISPATCHED":
                         return (
-                            <div className="flex flex-wrap gap-1.5">
-                                <button
-                                    onClick={() => {
-                                        setReceiveForm({
-                                            openingMeterReading: row.machineId?.currentMeterReading || 0,
-                                            fuelLevel: row.machineId?.currentFuelLevel || 0,
-                                            machineCondition: "Good",
-                                            documentsChecked: true,
-                                            remarks: "",
-                                            arrivalPhotos: [],
-                                        });
-                                        setReceiveModal(row);
-                                    }}
-                                    className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold"
-                                >
-                                    Accept at Site
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setSiteRejectForm({ reason: "", remarks: "" });
-                                        setSiteRejectModal(row);
-                                    }}
-                                    className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold"
-                                >
-                                    Reject Arrival
-                                </button>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                {permissions.canReceiveAtSite && (
+                                    <button
+                                        onClick={() => {
+                                            setReceiveForm({
+                                                openingMeterReading: row.machineId?.currentMeterReading || 0,
+                                                fuelLevel: row.machineId?.currentFuelLevel || 0,
+                                                machineCondition: "Good",
+                                                documentsChecked: true,
+                                                remarks: "",
+                                                arrivalPhotos: [],
+                                            });
+                                            setReceiveModal(row);
+                                        }}
+                                        className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold"
+                                    >
+                                        Accept at Site
+                                    </button>
+                                )}
+                                {permissions.canSiteReject && (
+                                    <button
+                                        onClick={() => {
+                                            setSiteRejectForm({ reason: "", remarks: "" });
+                                            setSiteRejectModal(row);
+                                        }}
+                                        className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold"
+                                    >
+                                        Reject Arrival
+                                    </button>
+                                )}
+                                {permissions.isAdmin && (
+                                    <span className="text-[11px] font-medium text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                                        In Transit • Site Inspection Pending
+                                    </span>
+                                )}
                             </div>
                         );
                     case "ACTIVE":
                         return (
-                            <button
-                                onClick={() => act(release, row._id, "Released from site")}
-                                className="px-2.5 py-1 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold"
-                            >
-                                Release
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                                {permissions.canReleaseMachine ? (
+                                    <button
+                                        onClick={() => act(release, row._id, "Released from site")}
+                                        className="px-2.5 py-1 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold"
+                                    >
+                                        Release
+                                    </button>
+                                ) : (
+                                    <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                        Active on Site
+                                    </span>
+                                )}
+                            </div>
                         );
                     default:
                         return <span className="text-slate-400 text-xs">—</span>;
@@ -417,11 +454,21 @@ const MachineRequests = () => {
     return (
         <MachinePage
             title="Machinery Requests"
-            subtitle="Full lifecycle: Request → Review → Allocate (Internal / Vendor) → Dispatch → Site Inspection → Active → Release"
+            subtitle={
+                permissions.isAdmin
+                    ? "Control & Approval Panel: Review project requirements and issue approvals/rejections"
+                    : "Operations Lifecycle: Request → Allocate (Internal/Vendor) → Dispatch → Site Inspection → Active → Release"
+            }
             actions={
-                <button onClick={() => setShowCreate((v) => !v)} className={btnPrimary}>
-                    {showCreate ? "Close" : "+ New Request"}
-                </button>
+                permissions.canCreateRequest ? (
+                    <button onClick={() => setShowCreate((v) => !v)} className={btnPrimary}>
+                        {showCreate ? "Close" : "+ New Request"}
+                    </button>
+                ) : (
+                    <span className="text-xs font-semibold px-3 py-1.5 bg-purple-100 text-purple-800 rounded-lg">
+                        Admin Approval & Monitor Mode
+                    </span>
+                )
             }
         >
             {/* KPI Summary Cards */}
@@ -757,8 +804,8 @@ const MachineRequests = () => {
                                     onChange={(e) => setVendorForm({ ...vendorForm, operatorProvidedBy: e.target.value })}
                                     className="mt-1 w-full border border-slate-300 p-2.5 rounded-xl text-sm"
                                 >
-                                    <option value="VENDOR">Vendor Provides Operator</option>
-                                    <option value="COMPANY">Company Assigns Own Operator</option>
+                                    <option value="Vendor">Vendor Provides Operator</option>
+                                    <option value="Company">Company Assigns Own Operator</option>
                                 </select>
                             </div>
 

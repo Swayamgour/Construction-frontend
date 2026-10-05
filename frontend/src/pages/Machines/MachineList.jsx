@@ -20,6 +20,8 @@ import {
 import MaintenanceDueBanner from "./MaintenanceDueBanner";
 import { getFileUrl } from "../../utils/fileUrl";
 
+import { getMachinePermissions } from "../../helper/machinePermissions";
+
 function ExpiryChip({ label, date }) {
     const d = daysUntil(date);
     if (d === null) return null;
@@ -31,7 +33,7 @@ function ExpiryChip({ label, date }) {
 export default function MachineList() {
     const navigate = useNavigate();
     const { role } = CheckRole();
-    const canManage = role === "admin" || role === "manager";
+    const permissions = getMachinePermissions(role);
     const [params, setParams] = useSearchParams();
     const { data, isLoading, isError } = useGetAllMachinesQuery();
 
@@ -70,10 +72,10 @@ export default function MachineList() {
 
     return (
         <MachinePage
-            title="Machines"
-            subtitle={`${filtered.length} of ${machines.length} machines`}
+            title={permissions.isAdmin ? "All Machines (Fleet Monitor)" : "Machine Management"}
+            subtitle={`${filtered.length} of ${machines.length} machines registered in central fleet`}
             actions={
-                canManage && (
+                permissions.isManager && (
                     <>
                         <button className={btnGhost} onClick={() => navigate("/assign")}>Assign Machine</button>
                         <button className={btnPrimary} onClick={() => navigate("/machine/add")}>+ Add Machine</button>
@@ -132,7 +134,7 @@ export default function MachineList() {
                 <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Could not load machines.</div>
             ) : filtered.length === 0 ? (
                 <EmptyState title={machines.length === 0 ? "No machines added yet" : "No machines match these filters"}>
-                    {machines.length === 0 && canManage && (
+                    {machines.length === 0 && permissions.canAddMachine && (
                         <button className={btnPrimary} onClick={() => navigate("/machine/add")}>Add your first machine</button>
                     )}
                 </EmptyState>

@@ -89,7 +89,7 @@ const TABS = [
     { to: "/machine/list", label: "Machines", icon: Factory, roles: ["admin", "manager", "supervisor"] },
     { to: "/machinery/requests", label: "Requests", icon: Truck, roles: ["admin", "manager", "supervisor"] },
     { to: "/assign/active", label: "Assignments", icon: Link2, roles: ["admin", "manager", "supervisor"] },
-    { to: "/assign", label: "Assign Machine", icon: Wrench, roles: ["admin", "manager"] },
+    { to: "/assign", label: "Assign Machine", icon: Wrench, roles: ["manager"] },
 ];
 
 export function MachineNav() {

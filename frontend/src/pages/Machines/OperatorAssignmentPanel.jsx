@@ -8,6 +8,7 @@ import {
     useGetLabourQuery,
 } from "../../Reduxe/Api";
 import { CheckRole } from "../../helper/CheckRole";
+import { getMachinePermissions } from "../../helper/machinePermissions";
 
 /**
  * NEW — wires up the operator assignment lifecycle added on the backend
@@ -26,7 +27,7 @@ import { CheckRole } from "../../helper/CheckRole";
  */
 export default function OperatorAssignmentPanel({ assignment, onChanged }) {
     const { role } = CheckRole();
-    const canManage = ["admin", "manager"].includes(role);
+    const permissions = getMachinePermissions(role);
 
     const [showHistory, setShowHistory] = useState(false);
     const [mode, setMode] = useState(null); // "assign" | "change" | "remove" | null
@@ -44,7 +45,7 @@ export default function OperatorAssignmentPanel({ assignment, onChanged }) {
     const history = historyResp?.data?.history || [];
 
     // Query Labour collection (canonical site workforce) for operators
-    const { data: labourResp } = useGetLabourQuery(undefined, { skip: !canManage || mode === null });
+    const { data: labourResp } = useGetLabourQuery(undefined, { skip: !permissions.canAssignOperator || mode === null });
     const allLabours = Array.isArray(labourResp) ? labourResp : labourResp?.data || [];
     const operators = allLabours.filter((l) => l.category === "Operator");
     const displayOperators = operators.length > 0 ? operators : allLabours;
@@ -86,7 +87,7 @@ export default function OperatorAssignmentPanel({ assignment, onChanged }) {
         <div className="mt-4 pt-4 border-t border-blue-200/60">
             <div className="flex items-center justify-between mb-2">
                 <span className="text-gray-600 text-sm font-medium">Operator</span>
-                {canManage && !mode && (
+                {permissions.canAssignOperator && !mode && (
                     <div className="flex gap-2">
                         {!assignment.operatorId ? (
                             <button

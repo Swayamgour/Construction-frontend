@@ -6,20 +6,21 @@ import {
 } from "../../Reduxe/Api";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import { CheckRole } from "../../helper/CheckRole";
+import { getMachinePermissions } from "../../helper/machinePermissions";
 
-/**
- * Rewritten to match the real backend Machine schema (models/Machine.js) —
- * the previous version of this form posted fields (name, ownership,
- * vendorId, rateType, rentRate, internalRate, fuelType) that don't exist
- * anywhere in the Machine model or addMachine/updateMachine controllers,
- * so nothing it submitted was ever actually saved correctly. It also
- * called useGetMachineByIdQuery / useUpdateMachineMutation, neither of
- * which existed as real endpoints — both are now real
- * (GET/PUT /api/machines/:id).
- */
 export default function AddEditMachine() {
     const navigate = useNavigate();
     const { id } = useParams();
+    const { role } = CheckRole();
+    const permissions = getMachinePermissions(role);
+
+    useEffect(() => {
+        if (permissions.isAdmin) {
+            toast.error("Admins have view & approval access only. Operational editing is reserved for Managers.");
+            navigate(id ? `/machine/${id}` : "/machine/list", { replace: true });
+        }
+    }, [permissions.isAdmin, navigate, id]);
 
     const { data } = useGetMachineDetailsQuery(id, { skip: !id });
     const [addMachine, { isLoading: adding }] = useAddMachineMutation();

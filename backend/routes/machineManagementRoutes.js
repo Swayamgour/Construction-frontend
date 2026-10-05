@@ -76,9 +76,9 @@ router.get("/requests/:id/history", auth, roleCheck("admin", "manager", "supervi
 router.patch("/requests/:id/approve", auth, roleCheck("admin"), checkProjectAccess(machineRequestProject), approveMachineRequest);
 router.patch("/requests/:id/reject", auth, roleCheck("admin"), checkProjectAccess(machineRequestProject), rejectMachineRequest);
 router.patch("/requests/:id/cancel", auth, roleCheck("admin", "manager", "supervisor"), checkProjectAccess(machineRequestProject), cancelMachineRequest);
-router.patch("/requests/:id/allocate", auth, roleCheck("admin"), checkProjectAccess(machineRequestProject), allocateMachineRequest);
-router.patch("/requests/:id/vendor-procure", auth, roleCheck("admin"), checkProjectAccess(machineRequestProject), procureVendorMachine);
-router.patch("/requests/:id/dispatch", auth, roleCheck("admin"), checkProjectAccess(machineRequestProject), dispatchMachineRequest);
+router.patch("/requests/:id/allocate", auth, roleCheck("admin", "manager"), checkProjectAccess(machineRequestProject), allocateMachineRequest);
+router.patch("/requests/:id/vendor-procure", auth, roleCheck("admin", "manager"), checkProjectAccess(machineRequestProject), procureVendorMachine);
+router.patch("/requests/:id/dispatch", auth, roleCheck("admin", "manager"), checkProjectAccess(machineRequestProject), dispatchMachineRequest);
 router.patch(
     "/requests/:id/receive",
     auth,
@@ -93,13 +93,13 @@ router.patch("/requests/:id/release", auth, roleCheck("admin", "manager"), check
 /* ------------------------------ DOCUMENTS -------------------------------- */
 router.post("/:id/documents", auth, roleCheck("admin", "manager"), upload.single("file"), addMachineDocument);
 router.get("/:id/documents", auth, roleCheck("admin", "manager", "supervisor", "operator"), listMachineDocuments);
-router.patch("/documents/:docId/verify", auth, roleCheck("admin", "manager"), verifyMachineDocument);
+router.patch("/documents/:docId/verify", auth, roleCheck("admin"), verifyMachineDocument);
 router.get("/documents/expiring", auth, roleCheck("admin", "manager"), getExpiringDocuments);
 
 /* ------------------------------ OPERATOR LOGS ----------------------------- */
 router.post("/:id/operator", auth, roleCheck("admin", "manager", "supervisor", "operator"), logMachineOperatorDay);
 router.get("/:id/operator-logs", auth, roleCheck("admin", "manager", "supervisor"), listMachineOperatorLogs);
-router.patch("/operator-logs/:logId/approve", auth, roleCheck("admin", "manager"), approveOperatorLog);
+router.patch("/operator-logs/:logId/approve", auth, roleCheck("admin"), approveOperatorLog);
 
 /* ---------------------- OPERATOR ASSIGNMENT LIFECYCLE -------------------- */
 router.post("/assignments/:assignmentId/operator", auth, roleCheck("admin", "manager"), checkProjectAccess(machineAssignmentProject), assignOperatorToMachine);

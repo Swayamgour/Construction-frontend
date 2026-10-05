@@ -185,6 +185,9 @@ export const procureVendorMachine = async (req, res) => {
             return fail(res, 400, `Cannot procure vendor machine for request in ${request.status} status`);
         }
 
+        const normalizedOperator =
+            String(operatorProvidedBy || "").toUpperCase() === "COMPANY" ? "Company" : "Vendor";
+
         // Find or create external rented machine in Machine Master
         let machine = await Machine.findOne({ machineNumber: vendorMachineNumber });
         if (!machine) {
@@ -193,7 +196,7 @@ export const procureVendorMachine = async (req, res) => {
                 machineType: machineType || request.machineType,
                 brand: brand || "",
                 model: model || "",
-                ownedOrRented: "Rented",
+                ownedOrRented: "rented",
                 vendorId,
                 status: "Assigned",
                 hourlyRate: rateType === "PER_HOUR" ? Number(rentalRate) || 0 : 0,
@@ -207,14 +210,15 @@ export const procureVendorMachine = async (req, res) => {
                     rentalRate: Number(rentalRate) || 0,
                     securityDeposit: Number(securityDeposit) || 0,
                     transportCost: Number(transportCost) || 0,
-                    operatorProvidedBy: operatorProvidedBy || "VENDOR",
+                    operatorProvidedBy: normalizedOperator,
+                    vendorRemarks: vendorRemarks || "",
                 },
                 notes: `Procured for Request #${request.requestNumber}`,
             });
         } else {
             machine.status = "Assigned";
             machine.vendorId = vendorId;
-            machine.ownedOrRented = "Rented";
+            machine.ownedOrRented = "rented";
             await machine.save();
         }
 
@@ -227,7 +231,7 @@ export const procureVendorMachine = async (req, res) => {
         request.contractEnd = contractEnd ? new Date(contractEnd) : null;
         request.securityDeposit = Number(securityDeposit) || 0;
         request.transportCost = Number(transportCost) || 0;
-        request.operatorProvidedBy = operatorProvidedBy || "VENDOR";
+        request.operatorProvidedBy = normalizedOperator;
         request.vendorRemarks = vendorRemarks || "";
         request.machineId = machine._id;
         request.status = "ALLOCATED";

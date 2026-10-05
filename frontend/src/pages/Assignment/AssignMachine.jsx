@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
@@ -7,11 +7,23 @@ import {
     useGetAllMachinesQuery,
     useGetLabourQuery,
 } from "../../Reduxe/Api";
+import { CheckRole } from "../../helper/CheckRole";
+import { getMachinePermissions } from "../../helper/machinePermissions";
 import { MachinePage, Section, Field, StatusBadge, Spinner, inputCls, daysUntil, fmtDate, btnPrimary, btnGhost } from "../../components/machine/machineUi";
 
 export default function AssignMachine() {
     const navigate = useNavigate();
     const [params] = useSearchParams();
+    const { role } = CheckRole();
+    const permissions = getMachinePermissions(role);
+
+    useEffect(() => {
+        if (permissions.isAdmin) {
+            toast.error("Admins have view & monitoring access only. Machine assignment is an operational task for Managers.");
+            navigate("/assign/active", { replace: true });
+        }
+    }, [permissions.isAdmin, navigate]);
+
     const { data: machinesData, isLoading: l1 } = useGetAllMachinesQuery();
     const { data: projects, isLoading: l2 } = useGetProjectsQuery();
     const { data: labourData, isLoading: l3 } = useGetLabourQuery();

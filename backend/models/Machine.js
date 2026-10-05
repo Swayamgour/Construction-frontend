@@ -7,7 +7,7 @@ const machineSchema = new mongoose.Schema({
   engineNumber: { type: String },
   chassisNumber: { type: String },
   machineType: { type: String }, // e.g., Excavator, Truck
-  ownedOrRented: { type: String, enum: ["owned", "rented"], default: "owned" },
+  ownedOrRented: { type: String, enum: ["owned", "rented"], lowercase: true, default: "owned" },
 
   // Rates & Costing
   hourlyRate: { type: Number, default: 0 },
@@ -27,7 +27,12 @@ const machineSchema = new mongoose.Schema({
     contractEnd: { type: Date, default: null },
     securityDeposit: { type: Number, default: 0 },
     transportCost: { type: Number, default: 0 },
-    operatorProvidedBy: { type: String, enum: ["Company", "Vendor"], default: "Company" },
+    operatorProvidedBy: {
+      type: String,
+      enum: ["Company", "Vendor"],
+      default: "Company",
+      set: (v) => (!v ? "Company" : String(v).toUpperCase() === "COMPANY" ? "Company" : "Vendor"),
+    },
     vendorRemarks: { type: String, default: "" },
   },
 

@@ -57,8 +57,10 @@ export default function AssignTask() {
     const handleProjectChange = (selectedProjectId) => {
         setForm(prev => ({ ...prev, projectId: selectedProjectId }));
 
+        console.log("Selected Project ID:", projectData);
+
         // Find the selected project
-        const foundProject = projectData?.find(p => p._id === selectedProjectId);
+        const foundProject = projectData?.data?.find(p => p._id === selectedProjectId);
         setSelectedProject(foundProject);
 
         console.log("Selected Project:", foundProject);

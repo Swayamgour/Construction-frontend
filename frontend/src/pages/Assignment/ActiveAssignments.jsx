@@ -9,6 +9,7 @@ import {
     useGetProjectsQuery,
 } from "../../Reduxe/Api";
 import { CheckRole } from "../../helper/CheckRole";
+import { getMachinePermissions } from "../../helper/machinePermissions";
 import {
     MachinePage,
     StatusBadge,
@@ -23,7 +24,7 @@ import {
 export default function ActiveAssignments() {
     const navigate = useNavigate();
     const { role } = CheckRole();
-    const canManage = role === "admin" || role === "manager";
+    const permissions = getMachinePermissions(role);
 
     const { data, isLoading, isError, refetch } = useGetActiveAssignmentsQuery();
     const [releaseMachine, { isLoading: releasing }] = useReleaseMachineMutation();
@@ -81,9 +82,9 @@ export default function ActiveAssignments() {
 
     return (
         <MachinePage
-            title="Active Machine Assignments"
+            title={permissions.isAdmin ? "Active Machine Deployments (Monitor)" : "Active Machine Assignments"}
             subtitle={`${rows.length} machine${rows.length === 1 ? "" : "s"} currently deployed on active project sites`}
-            actions={canManage && <button className={btnPrimary} onClick={() => navigate("/assign")}>+ Assign Machine</button>}
+            actions={permissions.canAssignMachine && <button className={btnPrimary} onClick={() => navigate("/assign")}>+ Assign Machine</button>}
         >
             {isLoading ? (
                 <Spinner />
@@ -133,7 +134,7 @@ export default function ActiveAssignments() {
                                     <td className="px-4 py-3 text-slate-500">{fmtDate(a.assignedTo)}</td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center justify-end gap-2">
-                                            {canManage && (
+                                            {permissions.canTransferMachine && (
                                                 <button
                                                     onClick={() => {
                                                         setTransferForm({
@@ -160,7 +161,7 @@ export default function ActiveAssignments() {
                                                 <History size={13} /> History
                                             </button>
 
-                                            {canManage && (
+                                            {permissions.canReleaseMachine && (
                                                 <button
                                                     disabled={releasing}
                                                     onClick={() => handleRelease(a.machineId)}

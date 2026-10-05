@@ -71,10 +71,14 @@ const NAV_GROUPS = [
   {
     label: "Machinery",
     items: [
-      { name: "Machine Dashboard", icon: BarChart2, path: "/machine/dashboard", roles: ["admin", "manager", "supervisor"] },
-      { name: "Machines", icon: Factory, path: "/machine/list", roles: ["admin", "manager", "supervisor"] },
+      { name: "Machine Overview", icon: BarChart2, path: "/machine/dashboard", roles: ["admin", "manager", "supervisor"] },
+      { name: "All Machines", icon: Factory, path: "/machine/list", roles: ["admin"] },
+      { name: "Machine Management", icon: Factory, path: "/machine/list", roles: ["manager", "supervisor"] },
+      { name: "Add Machine", icon: Factory, path: "/machine/add", roles: ["manager"] },
       { name: "Machine Requests", icon: Truck, path: "/machinery/requests", roles: ["admin", "manager", "supervisor"] },
-      { name: "Machine Assignments", icon: ArrowRightLeft, path: "/assign/active", roles: ["admin", "manager", "supervisor"] },
+      { name: "Active Deployments", icon: ArrowRightLeft, path: "/assign/active", roles: ["admin"] },
+      { name: "Active Assignments", icon: ArrowRightLeft, path: "/assign/active", roles: ["manager", "supervisor"] },
+      { name: "Assign Machine", icon: ArrowRightLeft, path: "/assign", roles: ["manager"] },
     ],
   },
   {

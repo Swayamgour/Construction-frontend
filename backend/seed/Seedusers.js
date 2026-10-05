@@ -368,33 +368,6 @@ async function run() {
      * 7. LABOUR ASSIGNMENT — active assignment history (Alpha & Beta)
      * ==================================================================== */
     const assignmentDefs = [
-        { labourId: labours.labour1._id, projectId: projects["PRJ-ALPHA-001"]._id, assignedBy: users.manager1._id },
-        { labourId: labours.mistri1._id, projectId: projects["PRJ-ALPHA-001"]._id, assignedBy: users.manager1._id },
-        { labourId: labours.operator1._id, projectId: projects["PRJ-ALPHA-001"]._id, assignedBy: users.manager1._id },
-        { labourId: labours.labour2._id, projectId: projects["PRJ-BETA-002"]._id, assignedBy: users.manager2._id },
-        { labourId: labours.mistri2._id, projectId: projects["PRJ-BETA-002"]._id, assignedBy: users.manager2._id },
-        { labourId: labours.operator2._id, projectId: projects["PRJ-BETA-002"]._id, assignedBy: users.manager2._id },
-    ];
-
-    for (const a of assignmentDefs) {
-        await LabourAssignment.findOneAndUpdate(
-            { labourId: a.labourId, status: "Active" },
-            {
-                $setOnInsert: {
-                    ...a,
-                    assignmentDate: new Date(),
-                    status: "Active",
-                },
-            },
-            { upsert: true, new: true }
-        );
-    }
-    console.log("🔗 Labour assignments linked to Alpha & Beta projects");
-
-    /* ======================================================================
-     * 8. MACHINE ASSIGNMENT — machines allotted to projects w/ operator
-     * ==================================================================== */
-    const assignmentDefs = [
         {
             machineId: machines["UP78-EXC-101"]._id,
             projectId: projects["PRJ-ALPHA-001"]._id,
@@ -423,6 +396,26 @@ async function run() {
             assignedBy: users.manager1._id,
         },
     ];
+
+    for (const a of assignmentDefs) {
+        await LabourAssignment.findOneAndUpdate(
+            { labourId: a.labourId, status: "Active" },
+            {
+                $setOnInsert: {
+                    ...a,
+                    assignmentDate: new Date(),
+                    status: "Active",
+                },
+            },
+            { upsert: true, new: true }
+        );
+    }
+    console.log("🔗 Labour assignments linked to Alpha & Beta projects");
+
+    /* ======================================================================
+     * 8. MACHINE ASSIGNMENT — machines allotted to projects w/ operator
+     * ==================================================================== */
+
 
     for (const a of assignmentDefs) {
         await MachineAssignment.findOneAndUpdate(

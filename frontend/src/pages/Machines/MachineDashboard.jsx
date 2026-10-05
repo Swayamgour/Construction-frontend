@@ -4,6 +4,7 @@ import { useGetMachineDashboardStatsQuery } from "../../Reduxe/Api";
 import { MachinePage, KpiCard, Spinner, fmtMoney, btnPrimary, btnGhost } from "../../components/machine/machineUi";
 import MaintenanceDueBanner from "./MaintenanceDueBanner";
 import { CheckRole } from "../../helper/CheckRole";
+import { getMachinePermissions } from "../../helper/machinePermissions";
 
 /**
  * Machinery dashboard — finally uses GET /api/machines/dashboard/stats,
@@ -12,6 +13,7 @@ import { CheckRole } from "../../helper/CheckRole";
 export default function MachineDashboard() {
     const navigate = useNavigate();
     const { role } = CheckRole();
+    const permissions = getMachinePermissions(role);
     const { data, isLoading, isError } = useGetMachineDashboardStatsQuery();
     const s = data?.stats || {};
 
@@ -31,7 +33,7 @@ export default function MachineDashboard() {
             actions={
                 <>
                     <button className={btnGhost} onClick={() => navigate("/machinery/requests")}>Requests</button>
-                    {(role === "admin" || role === "manager") && (
+                    {permissions.canAddMachine && (
                         <button className={btnPrimary} onClick={() => navigate("/machine/add")}>+ Add Machine</button>
                     )}
                 </>

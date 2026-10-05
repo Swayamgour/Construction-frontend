@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAddMaintenanceMutation, useGetMachineDetailsQuery } from "../../Reduxe/Api";
+import { CheckRole } from "../../helper/CheckRole";
+import { getMachinePermissions } from "../../helper/machinePermissions";
 import { MachinePage, Section, Field, FileInput, StatusBadge, inputCls, btnPrimary, btnGhost } from "../../components/machine/machineUi";
 
 const SERVICE_TYPES = ["Routine Maintenance", "Oil Change", "Filter Replacement", "Brake Service", "Engine Repair", "Electrical Repair", "Tire Replacement", "Hydraulic Service", "Annual Service", "Emergency Repair", "Other"];
@@ -9,6 +11,16 @@ const SERVICE_TYPES = ["Routine Maintenance", "Oil Change", "Filter Replacement"
 export default function AddMaintenance() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { role } = CheckRole();
+    const permissions = getMachinePermissions(role);
+
+    useEffect(() => {
+        if (permissions.isAdmin) {
+            toast.error("Admins have view & monitoring access only. Maintenance logging is handled by Managers.");
+            navigate(`/machine/${id}`, { replace: true });
+        }
+    }, [permissions.isAdmin, navigate, id]);
+
     const { data } = useGetMachineDetailsQuery(id);
     const machine = data?.machine;
     const [addMaintenance, { isLoading }] = useAddMaintenanceMutation();

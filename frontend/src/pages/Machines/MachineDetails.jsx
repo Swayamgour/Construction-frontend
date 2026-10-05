@@ -18,6 +18,7 @@ import {
 } from "../../Reduxe/Api";
 import toast from "react-hot-toast";
 import { CheckRole } from "../../helper/CheckRole";
+import { getMachinePermissions } from "../../helper/machinePermissions";
 import OperatorAssignmentPanel from "./OperatorAssignmentPanel";
 import { MachineNav, StatusBadge, projectLabel } from "../../components/machine/machineUi";
 import { getFileUrl, isImageFile, isPdfFile } from "../../utils/fileUrl";
@@ -25,7 +26,7 @@ import { getFileUrl, isImageFile, isPdfFile } from "../../utils/fileUrl";
 export default function MachineDetails() {
     const { id } = useParams();
     const { role } = CheckRole();
-    const canManage = ["admin", "manager"].includes(role);
+    const permissions = getMachinePermissions(role);
 
     const { data, isLoading, refetch } = useGetMachineDetailsQuery(id);
     const [releaseMachine, { isLoading: isReleasing }] = useReleaseMachineMutation();
@@ -442,41 +443,65 @@ export default function MachineDetails() {
                             </div>
                         </div>
 
-                        {/* Action Buttons */}
-                        <div className="flex flex-wrap items-center gap-3">
-                            <Link
-                                to={`/machine/${id}/maintenance/add`}
-                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm flex items-center transition"
-                            >
-                                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                </svg>
-                                Add Maintenance
-                            </Link>
-
-                            {isCurrentlyAssigned && canManage && (
+                        {/* Action Buttons — Strictly Separated by Role */}
+                        {permissions.isAdmin ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 text-xs font-semibold rounded-xl">
+                                    Admin Fleet Monitor
+                                </span>
                                 <button
-                                    onClick={() => setShowTransferModal(true)}
-                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-sm flex items-center transition"
+                                    onClick={() => setActiveTab("documents")}
+                                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition"
                                 >
-                                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                    </svg>
-                                    Transfer Machine
+                                    View Documents
                                 </button>
-                            )}
+                                <button
+                                    onClick={() => setActiveTab("history")}
+                                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition"
+                                >
+                                    View History
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex flex-wrap items-center gap-3">
+                                {permissions.canAddMaintenance && (
+                                    <Link
+                                        to={`/machine/${id}/maintenance/add`}
+                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm flex items-center transition"
+                                    >
+                                        <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                        </svg>
+                                        Add Maintenance
+                                    </Link>
+                                )}
 
-                            <button
-                                onClick={handleRelease}
-                                disabled={!isCurrentlyAssigned || isReleasing}
-                                className={`px-4 py-2 text-sm font-semibold rounded-xl flex items-center transition ${isCurrentlyAssigned
-                                    ? "bg-rose-600 hover:bg-rose-700 text-white shadow-sm"
-                                    : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
-                                    }`}
-                            >
-                                {isReleasing ? "Releasing..." : "Release from Project"}
-                            </button>
-                        </div>
+                                {isCurrentlyAssigned && permissions.canTransferMachine && (
+                                    <button
+                                        onClick={() => setShowTransferModal(true)}
+                                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-sm flex items-center transition"
+                                    >
+                                        <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                        </svg>
+                                        Transfer Machine
+                                    </button>
+                                )}
+
+                                {permissions.canReleaseMachine && (
+                                    <button
+                                        onClick={handleRelease}
+                                        disabled={!isCurrentlyAssigned || isReleasing}
+                                        className={`px-4 py-2 text-sm font-semibold rounded-xl flex items-center transition ${isCurrentlyAssigned
+                                            ? "bg-rose-600 hover:bg-rose-700 text-white shadow-sm"
+                                            : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
+                                            }`}
+                                    >
+                                        {isReleasing ? "Releasing..." : "Release from Project"}
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -656,7 +681,7 @@ export default function MachineDetails() {
                                         </div>
                                         <h4 className="font-semibold text-slate-700">No Active Assignment</h4>
                                         <p className="text-xs text-slate-500 mt-1 mb-4">This machine is ready and available in the central yard.</p>
-                                        {canManage && (
+                                        {permissions.canAssignMachine && (
                                             <Link
                                                 to={`/assign/machine?machineId=${id}`}
                                                 className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm"
@@ -1155,7 +1180,7 @@ export default function MachineDetails() {
                                                             }`}>
                                                             {l.approved ? "Approved" : "Pending"}
                                                         </span>
-                                                        {!l.approved && canManage && (
+                                                        {!l.approved && permissions.canApproveOperatorLog && (
                                                             <button
                                                                 onClick={async () => {
                                                                     try {
@@ -1185,7 +1210,8 @@ export default function MachineDetails() {
                 {/* Tab 3: Structured Documents */}
                 {activeTab === "documents" && (
                     <div className="space-y-6">
-                        {/* Upload Document Form */}
+                        {/* Upload Document Form — Manager / Operational only */}
+                        {permissions.canUploadDocument && (
                         <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm">
                             <h3 className="text-lg font-bold text-slate-900 mb-2">Upload Structured Compliance Document</h3>
                             <p className="text-xs text-slate-500 mb-6">
@@ -1276,6 +1302,7 @@ export default function MachineDetails() {
                                 </div>
                             </form>
                         </div>
+                        )}
 
                         {/* Documents List */}
                         <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm">
@@ -1407,7 +1434,7 @@ export default function MachineDetails() {
                                                         {doc.verificationStatus || "PENDING"}
                                                     </span>
 
-                                                    {canManage && !doc.isPrimary && doc.verificationStatus !== "VERIFIED" && (
+                                                    {permissions.canVerifyDocument && !doc.isPrimary && doc.verificationStatus !== "VERIFIED" && (
                                                         <button
                                                             onClick={async () => {
                                                                 try {
@@ -1577,7 +1604,7 @@ export default function MachineDetails() {
                                                     {m.status || "Reported"}
                                                 </span>
 
-                                                {canManage && m.status !== "Resolved" && (
+                                                {permissions.canResolveMaintenance && m.status !== "Resolved" && (
                                                     <button
                                                         onClick={async () => {
                                                             try {

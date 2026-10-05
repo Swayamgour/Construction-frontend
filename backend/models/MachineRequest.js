@@ -53,8 +53,12 @@ const machineRequestSchema = new mongoose.Schema(
         rateType: { type: String, enum: ["PER_HOUR", "PER_DAY", "PER_MONTH", "FIXED_CONTRACT"], default: "PER_DAY" },
         contractStart: { type: Date, default: null },
         contractEnd: { type: Date, default: null },
-        transportCost: { type: Number, default: 0 },
-        operatorProvidedBy: { type: String, enum: ["Company", "Vendor"], default: "Company" },
+        operatorProvidedBy: {
+            type: String,
+            enum: ["Company", "Vendor"],
+            default: "Company",
+            set: (v) => (!v ? "Company" : String(v).toUpperCase() === "COMPANY" ? "Company" : "Vendor"),
+        },
 
         // ⭐ Movement timestamps — never collapsed into one "date" field
         requestedAt: { type: Date, default: Date.now },

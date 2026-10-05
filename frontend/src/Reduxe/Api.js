@@ -5,8 +5,8 @@ export const Api = createApi({
     reducerPath: "erpApi",
 
     baseQuery: fetchBaseQuery({
-        // baseUrl: "https://backendapi.ssconstructionsup.in/api/",
-        baseUrl: "http://localhost:5002/api/",
+        baseUrl: "https://backendapi.ssconstructionsup.in/api/",
+        // baseUrl: "http://localhost:5002/api/",
 
         prepareHeaders: (headers) => {
             const token = localStorage.getItem("token");
@@ -742,12 +742,18 @@ export const Api = createApi({
         }),
 
         getMachineRequestHistory: build.query({
-            query: (id) => `machinery/requests/${id}/history`,
+            query: (arg) => {
+                const id = typeof arg === "object" ? arg?.id : arg;
+                return `machinery/requests/${id}/history`;
+            },
             providesTags: ["MachineRequest"],
         }),
 
         approveMachineRequest: build.mutation({
-            query: (id) => ({ url: `machinery/requests/${id}/approve`, method: "PATCH" }),
+            query: (arg) => {
+                const id = typeof arg === "object" ? arg?.id : arg;
+                return { url: `machinery/requests/${id}/approve`, method: "PATCH" };
+            },
             invalidatesTags: ["MachineRequest"],
         }),
 
@@ -791,12 +797,19 @@ export const Api = createApi({
         }),
 
         cancelMachineRequest: build.mutation({
-            query: (id) => ({ url: `machinery/requests/${id}/cancel`, method: "PATCH" }),
+            query: (arg) => {
+                const id = typeof arg === "object" ? arg?.id : arg;
+                return { url: `machinery/requests/${id}/cancel`, method: "PATCH" };
+            },
             invalidatesTags: ["MachineRequest", "Machine"],
         }),
 
         releaseMachineRequest: build.mutation({
-            query: (id) => ({ url: `machinery/requests/${id}/release`, method: "PATCH" }),
+            query: (arg) => {
+                const id = typeof arg === "object" ? arg?.id : arg;
+                const reason = typeof arg === "object" ? arg?.reason : undefined;
+                return { url: `machinery/requests/${id}/release`, method: "PATCH", body: { reason } };
+            },
             invalidatesTags: ["MachineRequest", "Assignments", "Machine"],
         }),
 

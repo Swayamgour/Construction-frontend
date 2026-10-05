@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAddMachineMutation, useGetVendorsQuery } from "../../Reduxe/Api";
+import { CheckRole } from "../../helper/CheckRole";
+import { getMachinePermissions } from "../../helper/machinePermissions";
 import {
     MachinePage,
     Section,
@@ -24,11 +26,21 @@ const INITIAL = {
     rcExpiry: "", insuranceExpiry: "", notes: "",
     // rented only
     vendorId: "", rentalRate: "", rateType: "PER_DAY", contractStart: "", contractEnd: "",
-    securityDeposit: "", transportCost: "", operatorProvidedBy: "Company", vendorRemarks: "",
+    securityDeposit: "", transportCost: "", operatorProvidedBy: "Vendor", vendorRemarks: "",
 };
 
 export default function AddMachine() {
     const navigate = useNavigate();
+    const { role } = CheckRole();
+    const permissions = getMachinePermissions(role);
+
+    useEffect(() => {
+        if (permissions.isAdmin) {
+            toast.error("Admins have view & approval access only. Operational creation is reserved for Managers.");
+            navigate("/machine/list", { replace: true });
+        }
+    }, [permissions.isAdmin, navigate]);
+
     const [form, setForm] = useState(INITIAL);
     const [files, setFiles] = useState({ photo: null, rcFile: null, insuranceFile: null });
     const [addMachine, { isLoading }] = useAddMachineMutation();
