@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import StockTransfer from "../models/StockTransfer.js";
 import StockRequest from "../models/StockRequest.js";
-import { applyStockLedgerEntry, getProjectInventory } from "../utils/inventory.js";
+import { applyStockMovement, getInventorySummary } from "../services/inventoryService.js";
 import { success, fail, getPagination, buildPagination } from "../utils/apiResponse.js";
 import { logAudit } from "../utils/audit.js";
 import { notifyRoles, notifyUsers } from "../utils/notify.js";
@@ -68,7 +68,7 @@ export const createStockTransfer = async (req, res) => {
 
             const refNumber = request ? request.requestNumber : `TRF-${Date.now()}`;
 
-            const debit = await applyStockLedgerEntry({
+            const debit = await applyStockMovement({
                 projectId: sourceProjectId,
                 itemId: targetMatId,
                 qtyChange: -qty,
@@ -79,7 +79,7 @@ export const createStockTransfer = async (req, res) => {
                 session,
             });
 
-            const credit = await applyStockLedgerEntry({
+            const credit = await applyStockMovement({
                 projectId: targetDestId,
                 itemId: targetMatId,
                 qtyChange: qty,
@@ -173,7 +173,7 @@ export const cancelStockTransfer = async (req, res) => {
         let request;
         await session.withTransaction(async () => {
             // Reverse: credit back the source, debit back the destination.
-            await applyStockLedgerEntry({
+            await applyStockMovement({
                 projectId: transfer.sourceProjectId,
                 itemId: transfer.materialId,
                 qtyChange: +transfer.transferredQuantity,
@@ -183,7 +183,7 @@ export const cancelStockTransfer = async (req, res) => {
                 remarks: `Reversal: cancelled transfer (${reason || "no reason given"})`,
                 session,
             });
-            await applyStockLedgerEntry({
+            await applyStockMovement({
                 projectId: transfer.destinationProjectId,
                 itemId: transfer.materialId,
                 qtyChange: -transfer.transferredQuantity,

@@ -1,5 +1,5 @@
 import User from "../models/User.js";
-import Labour from "../models/Labour.js";
+import Labour, { generateNextLabourId, backfillLabourIds } from "../models/Labour.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { ALL_ROLES } from "../config/roles.js";
@@ -314,6 +314,7 @@ export const getManagerDetails = async (req, res) => {
 export const addLabour = async (req, res) => {
     try {
         const {
+            labourId,
             name,
             phone,
             gender,
@@ -347,10 +348,22 @@ export const addLabour = async (req, res) => {
         // Check duplicate phone
         const exists = await Labour.findOne({ phone });
         if (exists) {
-            return res.status(400).json({ message: "Labour already exists" });
+            return res.status(400).json({ message: "Labour already exists with this phone number" });
+        }
+
+        // Generate serial-wise unique labourId (e.g. LAB-CON-001) if not provided
+        let finalLabourId = labourId ? String(labourId).trim().toUpperCase() : null;
+        if (finalLabourId) {
+            const idExists = await Labour.findOne({ labourId: finalLabourId });
+            if (idExists) {
+                return res.status(400).json({ message: `Labour ID "${finalLabourId}" is already taken` });
+            }
+        } else {
+            finalLabourId = await generateNextLabourId();
         }
 
         const labour = await Labour.create({
+            labourId: finalLabourId,
             name,
             phone,
             gender,
@@ -365,7 +378,7 @@ export const addLabour = async (req, res) => {
             address,
             status: status || "Active",
             assignedProjects: projectAssigned ? [projectAssigned] : [],
-            createdBy: req.user.id
+            createdBy: req.user?.id || req.user?._id
         });
 
         res.status(201).json({
@@ -381,8 +394,22 @@ export const addLabour = async (req, res) => {
     }
 };
 
-
-
+/**
+ * GET /api/auth/next-labour-id
+ * Generates and previews the next serial Labour ID (e.g. LAB-CON-001, LAB-CON-002)
+ */
+export const getNextLabourId = async (req, res) => {
+    try {
+        const nextLabourId = await generateNextLabourId();
+        res.status(200).json({ success: true, nextLabourId });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Error generating next labour ID",
+            error: error.message
+        });
+    }
+};
 
 /**
  * PUT /api/auth/labours/:id
@@ -394,7 +421,7 @@ export const updateLabour = async (req, res) => {
     try {
         const { id } = req.params;
         const {
-            name, phone, gender, age, labourType, category,
+            labourId, name, phone, gender, age, labourType, category,
             wageType, dailyWage, monthlySalary, skillLevel,
             aadhaarNumber, address, status,
         } = req.body;
@@ -408,6 +435,17 @@ export const updateLabour = async (req, res) => {
             const exists = await Labour.findOne({ phone, _id: { $ne: id } });
             if (exists) {
                 return res.status(400).json({ message: "Another labour already uses this phone number" });
+            }
+        }
+
+        if (labourId !== undefined) {
+            const trimmed = String(labourId).trim().toUpperCase();
+            if (trimmed && trimmed !== labour.labourId) {
+                const idExists = await Labour.findOne({ labourId: trimmed, _id: { $ne: id } });
+                if (idExists) {
+                    return res.status(400).json({ message: `Labour ID "${trimmed}" is already assigned to another worker` });
+                }
+                labour.labourId = trimmed;
             }
         }
 
@@ -446,13 +484,14 @@ export const updateLabour = async (req, res) => {
 
 // import User from "../models/User.js";
 
-
-
 export const getLabours = async (req, res) => {
     try {
+        // Backfill any legacy records missing labourId asynchronously
+        backfillLabourIds().catch(() => {});
+
         const labours = await Labour.find()
             .populate("assignedProjects", "projectName location startDate")
-            .select("name phone skillLevel wageType dailyWage monthlySalary labourType category status assignedProjects createdAt")
+            .select("labourId name phone skillLevel wageType dailyWage monthlySalary labourType category status assignedProjects createdAt")
             .sort({ createdAt: -1 });
 
         const updatedLabours = await Promise.all(
@@ -623,8 +662,25 @@ export const getLaboursById = async (req, res) => {
             // 🔥 Final Response Fields
             {
                 $project: {
+                    labourId: 1,
                     name: 1,
                     phone: 1,
+                    gender: 1,
+                    age: 1,
+                    aadhaarNumber: 1,
+                    fatherName: 1,
+                    alternatePhone: 1,
+                    bankName: 1,
+                    accountNumber: 1,
+                    ifscCode: 1,
+                    joinDate: 1,
+                    joiningDate: 1,
+                    contractorName: 1,
+                    emergencyContact: 1,
+                    documents: 1,
+                    skills: 1,
+                    notes: 1,
+                    profilePhoto: 1,
                     skillLevel: 1,
                     wageType: 1,
                     dailyWage: 1,

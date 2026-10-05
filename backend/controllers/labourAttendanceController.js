@@ -638,7 +638,7 @@ export const getPendingLabourAttendance = async (req, res) => {
 
         const pending = await Attendance.find(filter)
             .populate("projectId", "projectName projectCode managerId")
-            .populate("labourId", "name phone skillLevel category")
+            .populate("labourId", "labourId name phone skillLevel category")
             .populate("markedBy", "name")
             .sort({ date: -1, createdAt: -1 })
             .lean();
@@ -683,7 +683,7 @@ export const getLabourAttendanceRecords = async (req, res) => {
         const [items, total, agg] = await Promise.all([
             Attendance.find(filter)
                 .populate("projectId", "projectName projectCode")
-                .populate("labourId", "name phone category skillLevel labourType dailyWage fatherName")
+                .populate("labourId", "labourId name phone category skillLevel labourType dailyWage fatherName")
                 .populate("markedBy", "name")
                 .populate("approvedBy", "name")
                 .sort({ date: -1, createdAt: -1 })
@@ -1028,7 +1028,7 @@ export const listOvertimeRecords = async (req, res) => {
 
         const [items, total, agg] = await Promise.all([
             Attendance.find(filter)
-                .populate("labourId", "name phone category")
+                .populate("labourId", "labourId name phone category")
                 .populate("projectId", "projectName projectCode")
                 .populate("overtimeApprovedBy", "name")
                 .sort({ date: -1 })

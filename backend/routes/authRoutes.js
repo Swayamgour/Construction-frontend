@@ -5,6 +5,7 @@ import {
     loginUser,
     getAllUser,
     addLabour,
+    getNextLabourId,
     updateLabour,
     getManagersAndSupervisors,
     getManagerDetails,
@@ -70,6 +71,13 @@ router.get(
     auth,
     roleCheck("admin", "manager", "supervisor"),
     getLaboursById
+);
+
+router.get(
+    "/next-labour-id",
+    auth,
+    roleCheck("admin", "manager", "supervisor"),
+    getNextLabourId
 );
 
 router.post(

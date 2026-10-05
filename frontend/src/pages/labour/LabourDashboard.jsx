@@ -123,10 +123,11 @@ export default function LabourDashboard() {
       // Search
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
+        const idMatch = l.labourId?.toLowerCase().includes(q);
         const nameMatch = l.name?.toLowerCase().includes(q);
         const phoneMatch = l.phone?.includes(q);
         const fatherMatch = l.fatherName?.toLowerCase().includes(q);
-        if (!nameMatch && !phoneMatch && !fatherMatch) return false;
+        if (!idMatch && !nameMatch && !phoneMatch && !fatherMatch) return false;
       }
 
       // Category
@@ -422,7 +423,7 @@ export default function LabourDashboard() {
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search labour name, phone, father's name..."
+              placeholder="Search by Labour ID (e.g. LAB-CON-001), name, phone..."
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
@@ -625,12 +626,19 @@ export default function LabourDashboard() {
                               {getInitials(labour.name)}
                             </div>
                             <div className="min-w-0">
-                              <Link
-                                to={`/LabourDetail/${labour._id}`}
-                                className="font-semibold text-slate-900 hover:text-indigo-600 transition flex items-center gap-1.5"
-                              >
-                                {labour.name}
-                              </Link>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Link
+                                  to={`/LabourDetail/${labour._id}`}
+                                  className="font-semibold text-slate-900 hover:text-indigo-600 transition flex items-center gap-1.5"
+                                >
+                                  {labour.name}
+                                </Link>
+                                {labour.labourId && (
+                                  <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    {labour.labourId}
+                                  </span>
+                                )}
+                              </div>
                               <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
                                 {labour.fatherName && <span>S/O {labour.fatherName}</span>}
                                 {labour.phone && (
@@ -854,7 +862,14 @@ export default function LabourDashboard() {
                           {labour.labourType?.includes("Mistri") ? <Wrench size={18} /> : <HardHat size={18} />}
                         </div>
                         <div className="min-w-0">
-                          <h3 className="font-bold text-slate-900 truncate">{labour.name}</h3>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h3 className="font-bold text-slate-900 truncate">{labour.name}</h3>
+                            {labour.labourId && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                {labour.labourId}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-slate-400">{labour.labourType}</p>
                         </div>
                       </div>

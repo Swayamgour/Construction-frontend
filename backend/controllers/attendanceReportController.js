@@ -26,7 +26,7 @@ export const getTodayAttendanceReport = async (req, res) => {
         const dateRange = { $gte: targetDay, $lt: nextDay(targetDay) };
 
         const labourAttendance = await Attendance.find({ projectId, date: dateRange })
-            .populate("labourId", "name phone skillLevel category labourType dailyWage fatherName")
+            .populate("labourId", "labourId name phone skillLevel category labourType dailyWage fatherName")
             .populate("assignmentId", "assignmentDate releaseDate status")
             .populate("markedBy", "name")
             .populate("approvedBy", "name");
@@ -114,7 +114,7 @@ export const getMonthlyAttendanceReport = async (req, res) => {
             projectId,
             date: { $gte: startDate, $lt: endDate },
         })
-            .populate("labourId", "name phone skillLevel")
+            .populate("labourId", "labourId name phone skillLevel")
             .sort({ date: 1 });
 
         // Per-labour totals (wages only from admin-approved records)

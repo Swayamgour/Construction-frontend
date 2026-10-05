@@ -400,7 +400,7 @@ export const listLabourAssignments = async (req, res) => {
 
         const [items, total] = await Promise.all([
             LabourAssignment.find(filter)
-                .populate("labourId", "name phone")
+                .populate("labourId", "labourId name phone category skillLevel")
                 .populate("projectId", "projectName projectCode")
                 .sort({ createdAt: -1 })
                 .skip(skip)

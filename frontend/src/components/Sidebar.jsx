@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  LayoutDashboard, UserPlus, Layers, Store, ClipboardList, Users,
+  UserPlus, Layers, Store, ClipboardList, Users,
   Factory, BarChart2, Boxes, ChevronDown, ArrowRightLeft,
   Clock, FileStack, Truck, CalendarCheck, AlertTriangle,
   PanelLeftClose, PanelLeftOpen, LogOut, X, History, ShieldCheck, UserX,
@@ -29,8 +29,8 @@ const NAV_GROUPS = [
     label: "Labour",
     items: [
       { name: "Labour Manage", icon: Users, path: "/LabourDashboard", roles: ["admin", "manager", "supervisor"] },
-      { name: "Unassigned Labour", icon: UserX, path: "/labour/unassigned", roles: ["admin", "manager"] },
-      { name: "Assign Labour", icon: Users, path: "/AssignLabour", roles: ["admin", "manager"] },
+      { name: "Unassigned Labour", icon: UserX, path: "/labour/unassigned", roles: ["manager"] },
+      { name: "Assign Labour", icon: Users, path: "/AssignLabour", roles: ["manager"] },
 
       { name: "Attendance / Workforce", icon: ClipboardList, path: "/attendance/workforce", roles: ["admin"] },
       { name: "Attendance Labour", icon: ClipboardList, path: "/AttendanceLabour", roles: ["manager", "supervisor"] },
@@ -42,7 +42,7 @@ const NAV_GROUPS = [
       { name: "Labour Overtime", icon: Clock, path: "/labour/overtime", roles: ["manager", "supervisor"] },
       { name: "Project Active Labour", icon: Users, path: "/labour/project-active", roles: ["admin", "manager", "supervisor"] },
       { name: "Labour Full History", icon: History, path: "/labour/full-history", roles: ["admin", "manager", "supervisor"] },
-      { name: "Labour Reports", icon: BarChart2, path: "/labour/reports", roles: ["admin", "manager", "supervisor"] },
+      // { name: "Labour Reports", icon: BarChart2, path: "/labour/reports", roles: ["admin", "manager", "supervisor"] },
       { name: "Overtime Settings", icon: Clock, path: "/labour/overtime-settings", roles: ["admin", "manager"] },
     ],
   },
@@ -56,15 +56,16 @@ const NAV_GROUPS = [
   {
     label: "Materials & Inventory",
     items: [
-      { name: "Material Approvals", icon: ClipboardList, path: "/stock/requests", roles: ["admin"] },
-      { name: "Material Requests", icon: ClipboardList, path: "/stock/requests", roles: ["manager", "storekeeper"] },
-      { name: "Site Requests", icon: ClipboardList, path: "/stock/requests", roles: ["supervisor"] },
+      { name: "Material Requests", icon: ClipboardList, path: "/stock/requests", roles: ["admin", "manager", "supervisor", "storekeeper"] },
       { name: "Purchase Orders", icon: Store, path: "/purchase-orders", roles: ["admin", "manager", "storekeeper"] },
       { name: "Goods Receipts (GRN)", icon: Boxes, path: "/stock/operations?tab=receipts", roles: ["admin", "manager", "storekeeper", "supervisor"] },
-      { name: "Central Stock & Ledger", icon: Boxes, path: "/stock/operations", roles: ["admin"] },
-      { name: "Inventory & Ledger", icon: Boxes, path: "/stock/operations", roles: ["manager", "storekeeper"] },
-      { name: "Site Inventory", icon: Boxes, path: "/stock/operations", roles: ["supervisor"] },
-      { name: "Stock Consumption", icon: ArrowRightLeft, path: "/consumption", roles: ["manager", "supervisor"] },
+      { name: "Inventory", icon: Boxes, path: "/stock/operations?tab=inventory", roles: ["admin", "manager", "storekeeper", "supervisor"] },
+      { name: "Transfers", icon: ArrowRightLeft, path: "/stock/operations?tab=transfers", roles: ["admin", "manager", "storekeeper"] },
+      { name: "Material Issues", icon: ClipboardCheck, path: "/stock/operations?tab=issues", roles: ["admin", "manager", "storekeeper", "supervisor"] },
+      { name: "Consumption", icon: Clock, path: "/consumption", roles: ["admin", "manager", "supervisor"] },
+      { name: "Returns", icon: History, path: "/stock/operations?tab=returns", roles: ["admin", "manager", "storekeeper", "supervisor"] },
+      { name: "Adjustments & Damage", icon: AlertTriangle, path: "/stock/operations?tab=adjustments", roles: ["admin", "manager", "storekeeper"] },
+      { name: "Stock Ledger & Reports", icon: BarChart2, path: "/stock/operations?tab=ledger", roles: ["admin", "manager", "storekeeper", "accountant"] },
     ],
   },
   {

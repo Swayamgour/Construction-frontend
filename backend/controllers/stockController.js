@@ -2,68 +2,60 @@ import mongoose from "mongoose";
 import Stock from "../models/Stock.js";
 import StockLedger from "../models/stockLedgerSchema.js";
 import StockIssue from "../models/StockIssue.js";
-import StockTransaction from "../models/StockTransaction.js";
-import { applyStockLedgerEntry } from "../utils/inventory.js";
+import {
+  issueStock,
+  transferStock,
+  returnStock,
+  receiveStockGRN,
+  applyStockMovement,
+  getInventorySummary,
+  getOrCreateCentralGodown,
+} from "../services/inventoryService.js";
 import { logAudit } from "../utils/audit.js";
-import { getOrCreateCentralGodown } from "../services/inventoryService.js";
-
-// ⚠️ NOTE ON A BUG FOUND & FIXED HERE (follow-up audit):
-// controllers/stockHelpers.js's adjustStock() queried
-// Stock.findOne({ projectId, itemId }) and Stock.create({ projectId, itemId,
-// qty, unit }) — but models/Stock.js has NO projectId or qty field at the
-// top level; real per-project balances live in Stock.projectBalances[],
-// and the total field is `quantity`, not `qty`. Every call to adjustStock
-// therefore missed all existing stock and (since Mongoose strips fields
-// not in the schema by default) created a throwaway, empty Stock document
-// instead of actually moving inventory. receiveMaterial/transferMaterial/
-// returnMaterial below looked like they worked (200/201 responses,
-// "stock" in the payload) but never touched real balances.
-// Fixed by routing all four functions through the same
-// applyStockLedgerEntry() choke-point the newer Stock Request/Transfer
-// modules already use, which operates on the real schema and is the
-// single place stock quantities are allowed to change from.
 
 // ===================================================
-// 1️⃣ RECEIVE MATERIAL (GRN)
+// 1. RECEIVE MATERIAL INTO STOCK
 // ===================================================
 export const receiveMaterial = async (req, res) => {
   const session = await mongoose.startSession();
   try {
-    const { projectId, itemId, qty, unit, reason, materialRequestId, purchaseOrderId } = req.body;
+    const { projectId, itemId, qty, unit, reason, purchaseOrderId } = req.body;
     const n = Number(qty);
 
     if (!projectId || !itemId || !Number.isFinite(n) || n <= 0) {
       return res.status(400).json({ message: "projectId, itemId and a positive qty are required" });
     }
 
-    let stock, txn;
+    let result;
     await session.withTransaction(async () => {
-      ({ stock } = await applyStockLedgerEntry({
-        projectId, itemId, qtyChange: n, transactionType: "GRN",
-        remarks: reason || "Material received", session,
-      }));
-
-      [txn] = await StockTransaction.create([{
-        projectId, itemId, type: "IN", qty: n, unit,
-        reason: reason || "Material received",
-        materialRequestId: materialRequestId || null,
-        purchaseOrderId: purchaseOrderId || null,
-        createdBy: req.user.id,
-      }], { session });
+      result = await applyStockMovement({
+        projectId,
+        itemId,
+        qtyChange: n,
+        transactionType: "GRN",
+        referenceId: purchaseOrderId || null,
+        remarks: reason || "Material received directly into stock",
+        userId: req.user.id,
+        session,
+      });
 
       await logAudit({
-        module: "Inventory", entityId: txn._id, action: "receive",
-        performedBy: req.user.id, remarks: reason || "",
-        meta: { projectId, itemId, qty: n }, projectId, session,
+        module: "Inventory",
+        entityId: result.ledgerEntry._id,
+        action: "receive",
+        performedBy: req.user.id,
+        remarks: reason || "",
+        meta: { projectId, itemId, qty: n },
+        projectId,
+        session,
       });
     });
 
     return res.status(201).json({
       message: "Material received & stock updated",
-      stock,
-      transaction: txn,
+      stock: result.stock,
+      ledgerEntry: result.ledgerEntry,
     });
-
   } catch (error) {
     return res.status(400).json({
       message: "Error receiving material",
@@ -74,25 +66,31 @@ export const receiveMaterial = async (req, res) => {
   }
 };
 
-
-
 // ===================================================
-// 2️⃣ USE MATERIAL (STOCK OUT)
+// 2. ISSUE MATERIAL (Store -> Site Task/Contractor)
+// CRITICAL: Debits Project Usable Stock, Credits Issued Buffer
 // ===================================================
 export const createStockIssue = async (req, res) => {
   const session = await mongoose.startSession();
   try {
-    const { projectId, items } = req.body;
-    const issuedBy = req.user.id;
+    const { projectId, items: rawItems, itemId, qty, quantity, purpose, issuedTo, remarks } = req.body;
+    const issuedBy = req.user?.id || req.user?._id;
 
-    if (!projectId || !items?.length) {
-      return res.status(400).json({ message: "Invalid data" });
+    let items = Array.isArray(rawItems) ? rawItems : [];
+    if (!items.length && itemId) {
+      const q = Number(quantity !== undefined ? quantity : qty);
+      items = [{ itemId, qty: q, purpose: purpose || "", issuedTo: issuedTo || "", remarks: remarks || "" }];
+    }
+
+    if (!projectId || !items.length) {
+      return res.status(400).json({ message: "Invalid data: projectId and items required" });
     }
     for (const it of items) {
-      const q = Number(it.qty);
+      const q = Number(it.qty !== undefined ? it.qty : it.quantity);
       if (!it.itemId || !Number.isFinite(q) || q <= 0) {
         return res.status(400).json({ message: `Invalid item/qty in issue payload: ${JSON.stringify(it)}` });
       }
+      it.qty = q;
     }
 
     let issue;
@@ -100,21 +98,34 @@ export const createStockIssue = async (req, res) => {
       [issue] = await StockIssue.create([{ projectId, issuedBy, items }], { session });
 
       for (const it of items) {
-        const qty = Number(it.qty);
-        const { ledgerEntry } = await applyStockLedgerEntry({
-          projectId, itemId: it.itemId, qtyChange: -qty, transactionType: "ISSUE",
-          referenceId: issue._id, referenceNumber: `ISS-${issue._id}`,
-          remarks: it.remarks || "Issued to project", session,
+        const qtyToIssue = Number(it.qty);
+        const { ledgerEntry } = await issueStock({
+          projectId,
+          itemId: it.itemId,
+          qty: qtyToIssue,
+          referenceId: issue._id,
+          referenceNumber: `ISS-${issue._id}`,
+          remarks: it.remarks || "Issued to site (added to issued buffer)",
+          userId: issuedBy,
+          session,
         });
+
         await logAudit({
-          module: "Inventory", entityId: ledgerEntry._id, action: "issue",
-          performedBy: issuedBy, meta: { projectId, itemId: it.itemId, qty }, projectId, session,
+          module: "Inventory",
+          entityId: ledgerEntry._id,
+          action: "issue",
+          performedBy: issuedBy,
+          meta: { projectId, itemId: it.itemId, qty: qtyToIssue },
+          projectId,
+          session,
         });
       }
     });
 
-    res.status(201).json({ message: "Stock issued successfully", issue });
-
+    res.status(201).json({
+      message: "Stock issued successfully (Usable Stock reduced, Issued Buffer credited)",
+      issue,
+    });
   } catch (err) {
     res.status(400).json({ message: "Issue error", error: err.message });
   } finally {
@@ -122,17 +133,15 @@ export const createStockIssue = async (req, res) => {
   }
 };
 
-
-
-
 // ===================================================
-// 3️⃣ TRANSFER MATERIAL
+// 3. TRANSFER MATERIAL (Inter-Project / Godown)
 // ===================================================
 export const transferMaterial = async (req, res) => {
   const session = await mongoose.startSession();
   try {
-    const { fromProjectId, toProjectId, itemId, qty, unit, reason } = req.body;
-    const n = Number(qty);
+    const { fromProjectId, toProjectId, itemId, qty, quantity, reason } = req.body;
+    const rawQty = quantity !== undefined ? quantity : qty;
+    const n = Number(rawQty);
 
     if (!fromProjectId || !toProjectId || !itemId || !Number.isFinite(n) || n <= 0) {
       return res.status(400).json({ message: "fromProjectId, toProjectId, itemId and a positive qty are required" });
@@ -141,41 +150,37 @@ export const transferMaterial = async (req, res) => {
       return res.status(400).json({ message: "fromProjectId and toProjectId must be different" });
     }
 
-    let fromStock, toStock, txn;
-    await session.withTransaction(async () => {
-      // Debit source first — applyStockLedgerEntry throws if this would go
-      // negative, which aborts the whole transaction (nothing partially
-      // applied), satisfying the "source and destination succeed together
-      // or not at all" rule.
-      ({ stock: fromStock } = await applyStockLedgerEntry({
-        projectId: fromProjectId, itemId, qtyChange: -n, transactionType: "TRANSFER_OUT",
-        remarks: reason || "Material transferred", session,
-      }));
-      ({ stock: toStock } = await applyStockLedgerEntry({
-        projectId: toProjectId, itemId, qtyChange: n, transactionType: "TRANSFER_IN",
-        remarks: reason || "Material transferred", session,
-      }));
+    const userId = req.user?.id || req.user?._id;
 
-      [txn] = await StockTransaction.create([{
-        itemId, type: "TRANSFER", qty: n, unit,
-        fromProject: fromProjectId, toProject: toProjectId,
-        reason: reason || "Material transferred", createdBy: req.user.id,
-      }], { session });
+    let transferResult;
+    await session.withTransaction(async () => {
+      transferResult = await transferStock({
+        sourceProjectId: fromProjectId,
+        destinationProjectId: toProjectId,
+        itemId,
+        quantity: n,
+        remarks: reason || "Material transferred between projects",
+        userId,
+        session,
+      });
 
       await logAudit({
-        module: "Inventory", entityId: txn._id, action: "transfer",
-        performedBy: req.user.id, meta: { fromProjectId, toProjectId, itemId, qty: n },
+        module: "Inventory",
+        entityId: transferResult.debit.ledgerEntry._id,
+        action: "transfer",
+        performedBy: userId,
+        meta: { fromProjectId, toProjectId, itemId, qty: n },
         session,
       });
     });
 
     return res.status(200).json({
-      message: "Material transferred",
-      fromStock,
-      toStock,
-      transaction: txn
+      message: "Material transferred atomically",
+      fromStock: transferResult.debit.stock,
+      toStock: transferResult.credit.stock,
+      sourceBalance: transferResult.sourceBalance,
+      destinationBalance: transferResult.destinationBalance,
     });
-
   } catch (error) {
     return res.status(400).json({
       message: "Error transferring material",
@@ -186,57 +191,52 @@ export const transferMaterial = async (req, res) => {
   }
 };
 
-
-
 // ===================================================
-// 4️⃣ RETURN MATERIAL (SITE → GODOWN / VENDOR)
+// 4. RETURN MATERIAL (Site -> Central Godown)
 // ===================================================
 export const returnMaterial = async (req, res) => {
   const session = await mongoose.startSession();
   try {
-    const { projectId, toProjectId, destinationProjectId, itemId, qty, unit, reason } = req.body;
-    const n = Number(qty);
+    const { projectId, toProjectId, destinationProjectId, itemId, qty, quantity, reason } = req.body;
+    const rawQty = quantity !== undefined ? quantity : qty;
+    const n = Number(rawQty);
 
     if (!projectId || !itemId || !Number.isFinite(n) || n <= 0) {
       return res.status(400).json({ message: "projectId, itemId and a positive qty are required" });
     }
 
-    let destId = toProjectId || destinationProjectId;
-    if (!destId) {
-      const godown = await getOrCreateCentralGodown(session);
-      destId = godown._id;
-    }
+    const destId = toProjectId || destinationProjectId;
 
-    let stock, txn;
+    const userId = req.user?.id || req.user?._id;
+
+    let result;
     await session.withTransaction(async () => {
-      ({ stock } = await applyStockLedgerEntry({
-        projectId, itemId, qtyChange: -n, transactionType: "RETURN",
-        remarks: reason || "Material returned", session,
-      }));
-
-      await applyStockLedgerEntry({
-        projectId: destId, itemId, qtyChange: n, transactionType: "RECEIPT",
-        remarks: `Returned material received from ${projectId}: ${reason || "Return from site"}`, session,
+      result = await returnStock({
+        sourceProjectId: projectId,
+        destinationProjectId: destId,
+        itemId,
+        quantity: n,
+        reason: reason || "Return material to central godown",
+        userId,
+        session,
       });
 
-      [txn] = await StockTransaction.create([{
-        projectId, itemId, type: "RETURN", qty: n, unit,
-        toProject: destId,
-        reason: reason || "Material returned", createdBy: req.user.id,
-      }], { session });
-
       await logAudit({
-        module: "Inventory", entityId: txn._id, action: "return",
-        performedBy: req.user.id, meta: { projectId, toProjectId: destId, itemId, qty: n }, projectId, session,
+        module: "Inventory",
+        entityId: result.debit.ledgerEntry._id,
+        action: "return",
+        performedBy: userId,
+        meta: { projectId, toProjectId: destId, itemId, qty: n },
+        projectId,
+        session,
       });
     });
 
     return res.status(201).json({
-      message: "Material returned and credited to central godown/store",
-      stock,
-      transaction: txn,
+      message: "Material returned and credited to central godown",
+      debit: result.debit,
+      credit: result.credit,
     });
-
   } catch (error) {
     return res.status(400).json({
       message: "Error returning material",
@@ -247,28 +247,18 @@ export const returnMaterial = async (req, res) => {
   }
 };
 
-
-
 // ===================================================
-// 5️⃣ ALL TRANSACTIONS OF A PROJECT
+// 5. ALL TRANSACTIONS / LEDGER OF A PROJECT
 // ===================================================
 export const getProjectTransactions = async (req, res) => {
   try {
     const { projectId } = req.params;
 
-    const txns = await StockTransaction.find({
-      $or: [
-        { projectId },
-        { fromProject: projectId },
-        { toProject: projectId },
-      ]
-    })
-      .populate("itemId", "name unit")
-      .populate("createdBy", "name role")
+    const txns = await StockLedger.find({ projectId })
+      .populate("itemId", "name unit category")
       .sort({ createdAt: -1 });
 
     return res.status(200).json(txns);
-
   } catch (error) {
     return res.status(500).json({
       message: "Error fetching transactions",
@@ -277,65 +267,38 @@ export const getProjectTransactions = async (req, res) => {
   }
 };
 
-
-
 // ===================================================
-// 6️⃣ PROJECT-WISE STOCK
+// 6. PROJECT-WISE STOCK (Usable, Issued Buffer, Damaged)
 // ===================================================
 export const getProjectStock = async (req, res) => {
   try {
     const { projectId } = req.params;
-
-    const allStock = await Stock.find().populate("itemId", "name unit category");
-
-    const filtered = allStock
-      .filter((st) => st.itemId)
-      .map((st) => {
-        const pb = st.projectBalances.find(
-          (p) => String(p.projectId) === String(projectId)
-        );
-
-        return {
-          itemId: st.itemId._id,
-          name: st.itemId.name,
-          category: st.itemId.category,
-          unit: st.itemId.unit,
-          qty: pb?.qty || 0,
-          damaged: st.damaged || 0,
-        };
-      });
-
-    res.status(200).json({ stock: filtered });
-
+    const inventory = await getInventorySummary({ projectId });
+    res.status(200).json({ stock: inventory });
   } catch (err) {
     res.status(500).json({ message: "Stock error", error: err.message });
   }
 };
 
-
-
 // ===================================================
-// 7️⃣ ITEM LEDGER
+// 7. ITEM LEDGER
 // ===================================================
 export const getItemLedger = async (req, res) => {
   try {
     const { itemId } = req.params;
 
     const ledger = await StockLedger.find({ itemId })
-      .populate("projectId", "projectName")
+      .populate("projectId", "projectName projectCode")
       .sort({ createdAt: -1 });
 
     res.status(200).json(ledger);
-
   } catch (err) {
     res.status(500).json({ message: "Ledger error", error: err.message });
   }
 };
 
-
-
 // ===================================================
-// 8️⃣ GET ALL ISSUES OF A PROJECT
+// 8. GET ALL ISSUES OF A PROJECT
 // ===================================================
 export const getProjectIssues = async (req, res) => {
   try {
@@ -346,7 +309,6 @@ export const getProjectIssues = async (req, res) => {
       .populate("items.itemId", "name unit");
 
     res.status(200).json(issues);
-
   } catch (err) {
     res.status(500).json({ message: "Issue fetch error", error: err.message });
   }

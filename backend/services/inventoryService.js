@@ -1,10 +1,8 @@
 import mongoose from "mongoose";
 import Stock from "../models/Stock.js";
 import StockLedger from "../models/stockLedgerSchema.js";
-import StockTransaction from "../models/StockTransaction.js";
 import Project from "../models/Project.js";
 import Item from "../models/Item.js";
-import { logAudit } from "../utils/audit.js";
 
 /**
  * ============================================================================
@@ -16,12 +14,12 @@ import { logAudit } from "../utils/audit.js";
  *    damage, adjust, opening) MUST pass through this service.
  * 2. TRANSACTION SAFETY: Operations support and respect Mongoose sessions.
  * 3. NO NEGATIVE STOCK: Prevents a project or godown balance from dropping below 0.
- * 4. IMMUTABLE AUDIT TRAIL: Every mutation writes a matching StockLedger row and
- *    StockTransaction record.
+ * 4. IMMUTABLE AUDIT TRAIL: Every mutation writes a matching StockLedger entry.
  * 5. SEPARATION OF CONCEPTS:
- *    - Usable Stock (quantity) vs Damaged Stock (damaged)
+ *    - Usable Stock (quantity/qty) vs Damaged Stock (damaged)
  *    - Central Godown vs Project Stock (stored in projectBalances)
- *    - Stock Issue (store -> site) vs Consumption (actual usage on task)
+ *    - Stock Issue (Store -> Issued Buffer) vs Consumption (Issued Buffer -> Consumed)
+ *      NO DOUBLE DEDUCTION!
  */
 
 /**
@@ -37,11 +35,10 @@ export const getOrCreateCentralGodown = async (session = null) => {
     }).session(session);
 
     if (!godown) {
-        // Find an admin user to set as creator
         const adminUser = await mongoose.model("User").findOne({ role: "admin" }).session(session);
         const createdBy = adminUser?._id || new mongoose.Types.ObjectId();
 
-        godown = await Project.create(
+        const created = await Project.create(
             [
                 {
                     projectName: "Central Godown / Main Store",
@@ -53,14 +50,14 @@ export const getOrCreateCentralGodown = async (session = null) => {
             ],
             { session }
         );
-        godown = godown[0];
+        godown = created[0];
     }
 
     return godown;
 };
 
 /**
- * Core atomic updater for Stock and StockLedger.
+ * Core atomic updater for Usable Stock and StockLedger.
  */
 export const applyStockMovement = async ({
     projectId,
@@ -112,7 +109,12 @@ export const applyStockMovement = async ({
     if (idx >= 0) {
         stock.projectBalances[idx].qty = newProjectQty;
     } else {
-        stock.projectBalances.push({ projectId, qty: newProjectQty });
+        stock.projectBalances.push({
+            projectId,
+            qty: newProjectQty,
+            issuedBuffer: 0,
+            damaged: 0,
+        });
     }
 
     // 5. Update overall usable quantity
@@ -146,65 +148,171 @@ export const applyStockMovement = async ({
         { session }
     );
 
-    // 8. Create StockTransaction record for legacy compatibility
-    let txn = null;
-    if (userId) {
-        const txnType = delta > 0 ? "IN" : (transactionType === "RETURN" ? "RETURN" : (transactionType.includes("TRANSFER") ? "TRANSFER" : "OUT"));
-        [txn] = await StockTransaction.create(
-            [
-                {
-                    projectId,
-                    itemId,
-                    type: txnType,
-                    qty: Math.abs(delta),
-                    reason: remarks || transactionType,
-                    createdBy: userId,
-                }
-            ],
-            { session }
-        );
-    }
-
-    return { stock, ledgerEntry, projectBalance: newProjectQty, transaction: txn };
+    return { stock, ledgerEntry, projectBalance: newProjectQty };
 };
 
 /**
- * 1. RECEIVE STOCK (e.g. from GRN, Vendor Delivery, or Purchase Order)
+ * AUTOMATIC STOCK CHECK: Item-wise availability check against Central Godown (or specified project).
+ * Calculates availableQty and shortageQty for every item.
  */
-export const receiveStock = async ({
-    projectId,
-    itemId,
-    qty,
-    unit = "",
-    referenceId = null,
-    referenceNumber = null,
-    remarks = "Material received",
-    userId = null,
-    rate = undefined,
-    session = null,
-}) => {
-    const n = Number(qty);
-    if (!Number.isFinite(n) || n <= 0) {
-        throw new Error("Receive quantity must be a positive number");
+export const checkStockAvailability = async ({ projectId = null, items = [], session = null }) => {
+    const godown = await getOrCreateCentralGodown(session);
+    const results = [];
+
+    for (const item of items) {
+        const itemId = item.itemId || item._id;
+        const requestedQty = Number(item.requestedQty || item.quantity || 0);
+
+        const stock = await Stock.findOne({ itemId }).session(session);
+
+        let godownStock = 0;
+        let projectStock = 0;
+
+        if (stock && stock.projectBalances) {
+            const godownEntry = stock.projectBalances.find(
+                (pb) => String(pb.projectId) === String(godown._id)
+            );
+            godownStock = godownEntry ? Number(godownEntry.qty || 0) : 0;
+
+            if (projectId) {
+                const projectEntry = stock.projectBalances.find(
+                    (pb) => String(pb.projectId) === String(projectId)
+                );
+                projectStock = projectEntry ? Number(projectEntry.qty || 0) : 0;
+            }
+        }
+
+        // Available from central godown for fulfillment
+        const availableQty = Math.min(requestedQty, godownStock);
+        const shortageQty = Math.max(0, requestedQty - availableQty);
+
+        let fulfillmentStatus = "PENDING";
+        if (shortageQty === 0) {
+            fulfillmentStatus = "AVAILABLE";
+        } else if (availableQty > 0) {
+            fulfillmentStatus = "PARTIALLY_AVAILABLE";
+        } else {
+            fulfillmentStatus = "SHORTAGE";
+        }
+
+        results.push({
+            itemId,
+            requestedQty,
+            availableInGodown: godownStock,
+            availableInProject: projectStock,
+            availableQty,
+            shortageQty,
+            fulfillmentStatus,
+            unit: item.unit || "",
+            materialName: item.materialName || "",
+        });
     }
 
-    return applyStockMovement({
-        projectId,
-        itemId,
-        qtyChange: n,
-        transactionType: "GRN",
-        referenceId,
-        referenceNumber,
-        remarks,
-        rate,
-        userId,
-        session,
-    });
+    const allAvailable = results.every((r) => r.shortageQty === 0);
+    const anyAvailable = results.some((r) => r.availableQty > 0);
+
+    const overallStatus = allAvailable
+        ? "AVAILABLE"
+        : anyAvailable
+        ? "PARTIALLY_AVAILABLE"
+        : "PROCUREMENT_REQUIRED";
+
+    return {
+        items: results,
+        overallStatus,
+        godownId: godown._id,
+        godownName: godown.projectName,
+    };
+};
+
+/**
+ * 1. RECEIVE STOCK VIA GRN (Single Receiving System)
+ * Routes to Central Godown or Direct Project Site based on deliveryType.
+ * Handles both accepted usable stock and damaged stock.
+ */
+export const receiveStockGRN = async ({
+    purchaseOrderId = null,
+    stockRequestId = null,
+    deliveryType = "CENTRAL_GODOWN",
+    destinationProjectId = null,
+    poNumber = "",
+    deliveryChallan = "",
+    items = [],
+    userId = null,
+    session = null,
+}) => {
+    let destId = destinationProjectId;
+    if (deliveryType === "CENTRAL_GODOWN" || !destId) {
+        const godown = await getOrCreateCentralGodown(session);
+        destId = godown._id;
+    }
+
+    const receiptResults = [];
+
+    for (const it of items) {
+        const received = Number(it.receivedQty || 0);
+        const damaged = Number(it.damagedQty || 0);
+        const returned = Number(it.returnQty || 0);
+        const accepted = it.acceptedQty !== undefined
+            ? Number(it.acceptedQty)
+            : Math.max(received - damaged - returned, 0);
+
+        if (received < 0 || damaged < 0 || returned < 0 || accepted < 0) {
+            throw new Error(`Invalid quantities for item ${it.itemId}`);
+        }
+
+        let acceptedResult = null;
+        let damageResult = null;
+
+        // Credit usable accepted stock
+        if (accepted > 0) {
+            acceptedResult = await applyStockMovement({
+                projectId: destId,
+                itemId: it.itemId,
+                qtyChange: accepted,
+                transactionType: "GRN",
+                referenceId: purchaseOrderId,
+                referenceNumber: poNumber || deliveryChallan || "GRN",
+                remarks: `GRN received (${deliveryType}): ${accepted} units accepted`,
+                userId,
+                session,
+            });
+        }
+
+        // Record damaged stock if any
+        if (damaged > 0) {
+            damageResult = await recordDamage({
+                projectId: destId,
+                itemId: it.itemId,
+                quantity: damaged,
+                reason: `Damaged on arrival (PO ${poNumber || ""})`,
+                userId,
+                session,
+            });
+        }
+
+        receiptResults.push({
+            itemId: it.itemId,
+            accepted,
+            damaged,
+            acceptedResult,
+            damageResult,
+        });
+    }
+
+    return {
+        destinationProjectId: destId,
+        deliveryType,
+        items: receiptResults,
+    };
 };
 
 /**
  * 2. ISSUE STOCK (Store -> Site/Task)
- * Takes material from available store stock and issues it to site.
+ * CRITICAL RULE:
+ * - Project Usable Stock (qty) decreases
+ * - Project Issued Buffer (issuedBuffer) increases
+ * - StockLedger: ISSUE
  */
 export const issueStock = async ({
     projectId,
@@ -221,7 +329,8 @@ export const issueStock = async ({
         throw new Error("Issue quantity must be a positive number");
     }
 
-    return applyStockMovement({
+    // 1. Debit Usable Stock and record StockLedger ISSUE entry
+    const movement = await applyStockMovement({
         projectId,
         itemId,
         qtyChange: -n,
@@ -232,17 +341,43 @@ export const issueStock = async ({
         userId,
         session,
     });
+
+    // 2. Increment Issued Buffer at this project
+    const stock = movement.stock;
+    const idx = stock.projectBalances.findIndex((pb) => String(pb.projectId) === String(projectId));
+    if (idx >= 0) {
+        stock.projectBalances[idx].issuedBuffer = Number(stock.projectBalances[idx].issuedBuffer || 0) + n;
+    } else {
+        stock.projectBalances.push({
+            projectId,
+            qty: 0,
+            issuedBuffer: n,
+            damaged: 0,
+        });
+    }
+    await stock.save({ session });
+
+    return {
+        ...movement,
+        issuedBuffer: idx >= 0 ? stock.projectBalances[idx].issuedBuffer : n,
+    };
 };
 
 /**
  * 3. CONSUME STOCK (Actual usage on site)
- * Records actual usage on a task or direct consumption.
+ * CRITICAL RULE:
+ * - Material was ALREADY deducted from Usable Stock during ISSUE
+ * - Consumption ONLY reduces Issued Buffer (issuedBuffer - qtyUsed)
+ * - DOES NOT deduct Project Usable Stock again (PREVENTS DOUBLE DEDUCTION)
+ * - StockLedger: CONSUMPTION
  */
 export const consumeStock = async ({
     projectId,
     itemId,
     qtyUsed,
-    isAlreadyIssued = false,
+    taskId = null,
+    referenceId = null,
+    referenceNumber = null,
     remarks = "Material consumed on site",
     userId = null,
     session = null,
@@ -252,30 +387,59 @@ export const consumeStock = async ({
         throw new Error("Consumed quantity must be a positive number");
     }
 
-    // If the material was ALREADY deducted from inventory during an ISSUE step,
-    // do NOT deduct stock balance again (prevents double deduction).
-    if (isAlreadyIssued) {
-        return {
-            alreadyIssued: true,
-            qtyUsed: n,
-            message: "Consumption recorded against existing issued quantity without double deduction."
-        };
+    // 1. Fetch Stock record
+    const stock = await Stock.findOne({ itemId }).session(session);
+    if (!stock) {
+        throw new Error(`Stock not found for item ${itemId}`);
     }
 
-    return applyStockMovement({
-        projectId,
-        itemId,
-        qtyChange: -n,
-        transactionType: "CONSUMPTION",
-        remarks,
-        userId,
-        session,
-    });
+    // 2. Find Project Balance
+    const idx = stock.projectBalances.findIndex((pb) => String(pb.projectId) === String(projectId));
+    if (idx < 0) {
+        throw new Error(`No project balance found for project ${projectId}`);
+    }
+
+    const currentBuffer = Number(stock.projectBalances[idx].issuedBuffer || 0);
+    if (currentBuffer < n) {
+        throw new Error(
+            `Insufficient issued buffer! Available issued buffer: ${currentBuffer}, attempted consumption: ${n}. Material must be issued to site activity first.`
+        );
+    }
+    const newBuffer = currentBuffer - n;
+    stock.projectBalances[idx].issuedBuffer = newBuffer;
+    await stock.save({ session });
+
+    // 3. Create immutable StockLedger record without touching usable balance
+    const currentUsable = Number(stock.projectBalances[idx].qty || 0);
+    const [ledgerEntry] = await StockLedger.create(
+        [
+            {
+                itemId,
+                projectId,
+                transactionType: "CONSUMPTION",
+                referenceId: referenceId || taskId,
+                referenceNumber: referenceNumber || `CONS-${Date.now()}`,
+                qtyIn: 0,
+                qtyOut: n,
+                balanceQty: currentUsable, // Usable balance remains unchanged!
+                remarks: remarks || `Consumed from issued buffer (remaining buffer: ${newBuffer})`,
+            },
+        ],
+        { session }
+    );
+
+    return {
+        stock,
+        ledgerEntry,
+        currentUsableBalance: currentUsable,
+        remainingIssuedBuffer: newBuffer,
+    };
 };
 
 /**
- * 4. TRANSFER STOCK (Source Project/Godown -> Destination Project)
- * Atomically debits source and credits destination.
+ * 4. TRANSFER STOCK (Source -> Destination)
+ * Atomic debit at source, credit at destination.
+ * StockLedger: TRANSFER_OUT at source, TRANSFER_IN at destination.
  */
 export const transferStock = async ({
     sourceProjectId,
@@ -331,7 +495,9 @@ export const transferStock = async ({
 };
 
 /**
- * 5. RETURN STOCK (Site -> Store / Central Godown)
+ * 5. RETURN STOCK (Site -> Central Godown / Store)
+ * Debits site stock, credits Central Godown (or specified destination).
+ * StockLedger: RETURN at site, RECEIPT at godown.
  */
 export const returnStock = async ({
     sourceProjectId,
@@ -347,7 +513,6 @@ export const returnStock = async ({
         throw new Error("Return quantity must be a positive number");
     }
 
-    // If destinationProjectId is not specified, default to Central Godown
     let destId = destinationProjectId;
     if (!destId) {
         const godown = await getOrCreateCentralGodown(session);
@@ -370,7 +535,7 @@ export const returnStock = async ({
         projectId: destId,
         itemId,
         qtyChange: n,
-        transactionType: "RECEIPT",
+        transactionType: "RETURN",
         remarks: `Returned material received from ${sourceProjectId}: ${reason}`,
         userId,
         session,
@@ -381,6 +546,8 @@ export const returnStock = async ({
 
 /**
  * 6. RECORD DAMAGE (Reduces usable stock, records damage count)
+ * Debits usable stock, increments damaged stock in Stock and projectBalances.
+ * StockLedger: DAMAGE
  */
 export const recordDamage = async ({
     projectId,
@@ -406,18 +573,22 @@ export const recordDamage = async ({
         session,
     });
 
-    // Increment damaged count in Stock document
-    await Stock.updateOne(
-        { _id: result.stock._id },
-        { $inc: { damaged: n } },
-        { session }
-    );
+    // Increment damaged count in Stock document and projectBalances
+    const stock = result.stock;
+    stock.damaged = Number(stock.damaged || 0) + n;
+
+    const idx = stock.projectBalances.findIndex((pb) => String(pb.projectId) === String(projectId));
+    if (idx >= 0) {
+        stock.projectBalances[idx].damaged = Number(stock.projectBalances[idx].damaged || 0) + n;
+    }
+    await stock.save({ session });
 
     return result;
 };
 
 /**
  * 7. ADJUST STOCK (Audit correction / Physical Count Difference)
+ * Requires authorized reason and writes StockLedger ADJUSTMENT entry.
  */
 export const adjustStock = async ({
     projectId,
@@ -489,6 +660,7 @@ export const recordOpeningStock = async ({
 
 /**
  * 9. INVENTORY QUERIES (Project, Godown, Item-wise)
+ * Returns usable balance, issuedBuffer, damaged, and total usable stock.
  */
 export const getInventorySummary = async ({ projectId = null, itemId = null } = {}) => {
     const filter = itemId ? { itemId } : {};
@@ -501,6 +673,9 @@ export const getInventorySummary = async ({ projectId = null, itemId = null } = 
         if (projectId) {
             const pb = s.projectBalances.find((p) => String(p.projectId) === String(projectId));
             const currentBalance = pb ? Number(pb.qty || 0) : 0;
+            const issuedBuffer = pb ? Number(pb.issuedBuffer || 0) : 0;
+            const damaged = pb ? Number(pb.damaged || 0) : 0;
+
             result.push({
                 stockId: s._id,
                 itemId: s.itemId._id,
@@ -509,8 +684,10 @@ export const getInventorySummary = async ({ projectId = null, itemId = null } = 
                 unit: s.itemId.unit,
                 hsnCode: s.itemId.hsnCode,
                 projectId,
-                currentBalance,
-                damaged: Number(s.damaged || 0),
+                currentBalance, // Usable in store/site
+                qty: currentBalance, // Alias for backward compatibility
+                issuedBuffer,   // Issued to site, not yet consumed
+                damaged,        // Damaged at project
                 totalUsableStock: Number(s.quantity || 0),
             });
         } else {
@@ -526,6 +703,8 @@ export const getInventorySummary = async ({ projectId = null, itemId = null } = 
                 projectBalances: s.projectBalances.map((pb) => ({
                     projectId: pb.projectId,
                     qty: Number(pb.qty || 0),
+                    issuedBuffer: Number(pb.issuedBuffer || 0),
+                    damaged: Number(pb.damaged || 0),
                 })),
             });
         }

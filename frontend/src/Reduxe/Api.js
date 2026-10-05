@@ -224,6 +224,11 @@ export const Api = createApi({
             providesTags: ["Labour"],
         }),
 
+        getNextLabourId: build.query({
+            query: () => "auth/next-labour-id",
+            providesTags: ["Labour"],
+        }),
+
         addLabour: build.mutation({
             query: (body) => ({ url: "auth/add-labour", method: "POST", body }),
             invalidatesTags: ["Labour"],
@@ -405,12 +410,7 @@ export const Api = createApi({
 
         transferMaterial: build.mutation({
             query: (body) => ({ url: "stock/transfer", method: "POST", body }),
-            invalidatesTags: ["Stock", "Transactions"],
-        }),
-
-        returnMaterial: build.mutation({
-            query: (body) => ({ url: "stock/return", method: "POST", body }),
-            invalidatesTags: ["Stock", "Transactions"],
+            invalidatesTags: ["Stock", "Inventory", "Transactions", "Ledger"],
         }),
 
         getItemLedgerByItem: build.query({
@@ -418,14 +418,9 @@ export const Api = createApi({
             providesTags: ["Stock"],
         }),
 
-        getProjectIssues: build.query({
-            query: (projectId) => `stock/issue/${projectId}`,
-            providesTags: ["Stock"],
-        }),
-
         createGRN: build.mutation({
             query: (body) => ({ url: `grn/add`, method: "POST", body }),
-            invalidatesTags: ["GRN"],
+            invalidatesTags: ["GRN", "Stock", "Inventory", "Ledger", "PurchaseOrder"],
         }),
 
         getGRN: build.query({
@@ -494,7 +489,37 @@ export const Api = createApi({
 
         reviewStockRequest: build.mutation({
             query: ({ id, ...body }) => ({ url: `stock/requests/${id}/review`, method: "PATCH", body }),
+            invalidatesTags: ["StockRequest", "Stock", "Inventory"],
+        }),
+
+        approveStockRequest: build.mutation({
+            query: ({ id, adminRemarks }) => ({ url: `stock/requests/${id}/approve`, method: "PATCH", body: { adminRemarks } }),
+            invalidatesTags: ["StockRequest", "Stock", "Inventory"],
+        }),
+
+        rejectStockRequest: build.mutation({
+            query: ({ id, rejectionReason, adminRemarks }) => ({ url: `stock/requests/${id}/reject`, method: "PATCH", body: { rejectionReason, adminRemarks } }),
             invalidatesTags: ["StockRequest"],
+        }),
+
+        checkRequestStock: build.query({
+            query: (id) => `stock/requests/${id}/stock-check`,
+            providesTags: ["StockRequest", "Stock", "Inventory"],
+        }),
+
+        createStockIssue: build.mutation({
+            query: (body) => ({ url: "stock/issue", method: "POST", body }),
+            invalidatesTags: ["Stock", "Inventory", "Transactions", "Ledger"],
+        }),
+
+        getProjectIssues: build.query({
+            query: (projectId) => `stock/issue/${projectId}`,
+            providesTags: ["Stock"],
+        }),
+
+        returnMaterial: build.mutation({
+            query: (body) => ({ url: "stock/return", method: "POST", body }),
+            invalidatesTags: ["Stock", "Inventory", "Transactions", "Ledger"],
         }),
 
         createStockTransfer: build.mutation({
@@ -1366,6 +1391,7 @@ export const {
 
     useGetLabourQuery,
     useGetLabourByIdQuery,
+    useGetNextLabourIdQuery,
     useAddLabourMutation,
     useUpdateLabourMutation,
     useAssignLabourMutation,
@@ -1405,7 +1431,7 @@ export const {
     useTransferMaterialMutation,
     useReturnMaterialMutation,
     useGetItemLedgerByItemQuery,
-    useGetProjectIssuesQuery,
+    // useGetProjectIssuesQuery,
     useCreateGRNMutation,
     useGetGRNQuery,
     useGetAllGRNQuery,
@@ -1421,6 +1447,12 @@ export const {
     useGetStockRequestsQuery,
     useGetStockRequestByIdQuery,
     useReviewStockRequestMutation,
+    useApproveStockRequestMutation,
+    useRejectStockRequestMutation,
+    useCheckRequestStockQuery,
+    useCreateStockIssueMutation,
+    useGetProjectIssuesQuery,
+    // useReturnMaterialMutation,
     useCreateStockTransferMutation,
     useGetStockTransfersQuery,
     useConfirmTransferReceiptMutation,

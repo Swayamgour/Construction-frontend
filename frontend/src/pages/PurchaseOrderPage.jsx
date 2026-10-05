@@ -50,6 +50,7 @@ const ACTIONS = [
 // Detail/edit modal — view any PO; DRAFT ones can have items/vendor edited
 // (backend only allows edits while status === DRAFT).
 const PODetailModal = ({ id, onClose }) => {
+    const navigate = useNavigate();
     const { data, isLoading } = useGetPurchaseOrderByIdQuery(id);
     const [updatePO, { isLoading: saving }] = useUpdatePurchaseOrderMutation();
     const po = data?.data || data;
@@ -78,17 +79,33 @@ const PODetailModal = ({ id, onClose }) => {
         <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-semibold">PO {id.slice(-8).toUpperCase()}</h2>
+                    <h2 className="text-lg font-semibold">{po?.poNumber || `PO ${id.slice(-8).toUpperCase()}`}</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-sm">Close</button>
                 </div>
                 {isLoading && <div className="text-sm text-gray-400 py-8 text-center">Loading…</div>}
                 {po && (
                     <>
                         <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-                            <div><span className="text-gray-500">Project:</span> {po.projectId?.projectName || po.projectId?.name || "-"}</div>
-                            <div><span className="text-gray-500">Vendor:</span> {po.vendorId?.companyName || po.vendorId?.name || "-"}</div>
-                            <div><span className="text-gray-500">Status:</span> {po.status}</div>
-                            <div><span className="text-gray-500">Grand Total:</span> ₹{Number(po.grandTotal || 0).toLocaleString()}</div>
+                            <div><span className="text-gray-500">Project:</span> <span className="font-medium">{po.projectId?.projectName || po.projectId?.name || "-"}</span></div>
+                            <div><span className="text-gray-500">Vendor:</span> <span className="font-medium">{po.vendorId?.companyName || po.vendorId?.name || "-"}</span></div>
+                            <div>
+                                <span className="text-gray-500">Delivery Routing:</span>{" "}
+                                {po.deliveryType === "DIRECT_PROJECT_SITE" ? (
+                                    <span className="text-amber-700 font-semibold">Direct Site ({po.deliveryProject?.projectName || po.deliveryProject?.name || "Site"})</span>
+                                ) : (
+                                    <span className="text-blue-700 font-semibold">Central Godown / Main Store</span>
+                                )}
+                            </div>
+                            <div><span className="text-gray-500">Status:</span> <span className={`px-2 py-0.5 rounded text-xs font-semibold ${STATUS_STYLES[po.status] || "bg-gray-100"}`}>{po.status}</span></div>
+                            <div className="col-span-2 flex justify-between items-center border-t border-b py-2">
+                                <span className="text-gray-600 font-medium">Grand Total:</span>
+                                <span className="text-base font-bold text-gray-900">₹{Number(po.grandTotal || 0).toLocaleString()}</span>
+                            </div>
+                            {po.stockRequestId && (
+                                <div className="col-span-2 text-xs bg-indigo-50 border border-indigo-200 text-indigo-800 px-3 py-1.5 rounded-lg">
+                                    Linked Material Request: #{String(po.stockRequestId?._id || po.stockRequestId).slice(-6).toUpperCase()}
+                                </div>
+                            )}
                         </div>
                         <table className="w-full text-sm border rounded-lg overflow-hidden">
                             <thead className="bg-gray-100">
@@ -130,7 +147,20 @@ const PODetailModal = ({ id, onClose }) => {
                             </button>
                         )}
                         {!editable && (
-                            <p className="mt-4 text-xs text-gray-400">Only DRAFT purchase orders can be edited.</p>
+                            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+                                <p className="text-xs text-gray-400">Only DRAFT purchase orders can be edited.</p>
+                                {(po.status === "ORDERED" || po.status === "PARTIALLY_RECEIVED") && (
+                                    <button
+                                        onClick={() => {
+                                            onClose();
+                                            navigate(`/stock/operations?tab=receipts&poId=${po._id}`);
+                                        }}
+                                        className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm flex items-center gap-1.5 transition-colors"
+                                    >
+                                        Receive Goods (Create GRN)
+                                    </button>
+                                )}
+                            </div>
                         )}
                         <AuditHistory module="PurchaseOrder" entityId={id} />
                     </>
@@ -230,7 +260,7 @@ const PurchaseOrderPage = () => {
                     onChange={(e) => setProjectId(e.target.value)}
                 >
                     <option value="">All Projects</option>
-                    {projects?.data?.map((p) => (
+                    {(Array.isArray(projects) ? projects : projects?.data || []).map((p) => (
                         <option key={p._id} value={p._id}>
                             {p.projectName || p.name}
                         </option>
@@ -269,8 +299,9 @@ const PurchaseOrderPage = () => {
                 <table className="min-w-full text-sm">
                     <thead className="bg-gray-100 text-gray-700">
                         <tr>
-                            <th className="px-4 py-3 text-left font-medium">PO ID</th>
+                            <th className="px-4 py-3 text-left font-medium">PO #</th>
                             <th className="px-4 py-3 text-left font-medium">Project</th>
+                            <th className="px-4 py-3 text-left font-medium">Routing</th>
                             <th className="px-4 py-3 text-left font-medium">Vendor</th>
                             <th className="px-4 py-3 text-left font-medium">Created On</th>
                             <th className="px-4 py-3 text-left font-medium">Grand Total</th>
@@ -281,14 +312,14 @@ const PurchaseOrderPage = () => {
                     <tbody>
                         {isLoading && (
                             <tr>
-                                <td colSpan={7} className="px-4 py-6 text-center text-gray-500">
+                                <td colSpan={8} className="px-4 py-6 text-center text-gray-500">
                                     Loading purchase orders…
                                 </td>
                             </tr>
                         )}
                         {!isLoading && orders.length === 0 && (
                             <tr>
-                                <td colSpan={7} className="px-4 py-6 text-center text-gray-500">
+                                <td colSpan={8} className="px-4 py-6 text-center text-gray-500">
                                     Koi purchase order nahi mila.
                                 </td>
                             </tr>
@@ -301,16 +332,27 @@ const PurchaseOrderPage = () => {
                             return (
                                 <tr key={po._id} className="border-t hover:bg-gray-50 transition-colors duration-150">
                                     <td className="px-4 py-3 text-blue-600 font-medium">
-                                        {po._id.slice(-8).toUpperCase()}
+                                        {po.poNumber || po._id.slice(-8).toUpperCase()}
                                     </td>
                                     <td className="px-4 py-3">
                                         {po.projectId?.projectName || po.projectId?.name || "-"}
                                     </td>
                                     <td className="px-4 py-3">
-                                        {po.vendorId?.companyName || po.vendorId?.name || "-"}
+                                        {po.deliveryType === "DIRECT_PROJECT_SITE" ? (
+                                            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                                                Direct Site: {po.deliveryProject?.projectName || po.deliveryProject?.name || "Site"}
+                                            </span>
+                                        ) : (
+                                            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
+                                                Central Godown
+                                            </span>
+                                        )}
                                     </td>
                                     <td className="px-4 py-3">
-                                        {po.createdAt ? new Date(po.createdAt).toLocaleString() : "-"}
+                                        {po.vendorId?.companyName || po.vendorId?.name || "-"}
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-500">
+                                        {po.createdAt ? new Date(po.createdAt).toLocaleDateString() : "-"}
                                     </td>
                                     <td className="px-4 py-3">₹{Number(po.grandTotal || 0).toLocaleString()}</td>
                                     <td className="px-4 py-3">
@@ -329,6 +371,14 @@ const PurchaseOrderPage = () => {
                                             >
                                                 View
                                             </button>
+                                            {(po.status === "ORDERED" || po.status === "PARTIALLY_RECEIVED") && (
+                                                <button
+                                                    onClick={() => navigate(`/stock/operations?tab=receipts&poId=${po._id}`)}
+                                                    className="px-2.5 py-1 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 transition-colors"
+                                                >
+                                                    Receive GRN
+                                                </button>
+                                            )}
                                             {visibleActions.length === 0 && (
                                                 <span className="text-xs text-gray-400">No action</span>
                                             )}

@@ -119,24 +119,26 @@ export default function StockConsumption() {
                 return;
             }
 
-            if (!it.qtyUsed || it.qtyUsed <= 0) {
-                toast.error("Quantity must be greater than 0 for all items");
-                return;
-            }
-
-            // Validate available qty
+            // Validate available issued buffer
             const stockItem = stockData?.stock?.find(
-                (s) => s.itemId === it.itemId
+                (s) => String(s.itemId) === String(it.itemId)
             );
 
             if (!stockItem) {
-                toast.error(`${it.stockItem?.name || 'Selected item'} not found in stock`);
+                toast.error(`${it.stockItem?.name || 'Selected item'} not found in project stock`);
                 return;
             }
 
-            if (Number(it.qtyUsed) > stockItem.qty) {
+            const buffer = Number(stockItem.issuedBuffer || 0);
+            if (buffer <= 0) {
                 return toast.error(
-                    `${stockItem.name} available qty is only ${stockItem.qty}`
+                    `${stockItem.name} has no issued buffer. Storekeeper must issue material to site first.`
+                );
+            }
+
+            if (Number(it.qtyUsed) > buffer) {
+                return toast.error(
+                    `${stockItem.name} issued buffer is only ${buffer}. Cannot consume more than what was issued to site.`
                 );
             }
         }
@@ -154,7 +156,7 @@ export default function StockConsumption() {
                 items: consumptionData
             }).unwrap();
 
-            toast.success("Consumption saved successfully!");
+            toast.success("Consumption recorded against issued buffer successfully (zero double deduction)!");
 
             // Reset form
             setItems([]);
@@ -172,16 +174,16 @@ export default function StockConsumption() {
 
     // Get stock status color
     const getStockStatusColor = (qty) => {
-        if (qty <= 0) return "bg-red-100 text-red-700 border-red-200";
-        if (qty < 10) return "bg-yellow-100 text-yellow-700 border-yellow-200";
-        return "bg-green-100 text-green-700 border-green-200";
+        if (qty <= 0) return "bg-red-50 text-red-700 border-red-200";
+        if (qty < 10) return "bg-yellow-50 text-yellow-700 border-yellow-200";
+        return "bg-green-50 text-green-700 border-green-200";
     };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 md:p-6">
             <div className="max-w-7xl mx-auto">
                 {/* HEADER */}
-                <div className="mb-8">
+                <div className="mb-6">
                     <div className="flex items-center gap-3 mb-4">
                         <button
                             className="p-2 bg-white rounded-lg shadow-sm hover:bg-gray-50 transition-colors border border-gray-200"
@@ -198,8 +200,20 @@ export default function StockConsumption() {
                                 <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
                                     Material Consumption
                                 </h1>
-                                <p className="text-gray-600">Check stock first, then record material usage</p>
+                                <p className="text-gray-600">Records material consumed on site from the issued buffer</p>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* TWO-STEP BUFFER INFO BANNER */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5 text-sm text-blue-900 flex items-start gap-3">
+                        <FiPackage className="text-blue-600 mt-0.5 shrink-0" size={18} />
+                        <div>
+                            <span className="font-semibold block">Single Business Flow — Two-Step Issue & Consumption:</span>
+                            <span className="text-xs text-blue-800">
+                                Material must first be issued by Storekeeper to site activity (Usable Stock debited, Issued Buffer credited).
+                                When site consumption is reported here, it debits the Issued Buffer with zero double deduction from Project Stock.
+                            </span>
                         </div>
                     </div>
 
@@ -220,9 +234,9 @@ export default function StockConsumption() {
                         >
                             {loadingProjects ? (
                                 <option>Loading projects...</option>
-                            ) : projects?.data?.map((p) => (
+                            ) : (Array.isArray(projects) ? projects : projects?.data || []).map((p) => (
                                 <option key={p._id} value={p._id}>
-                                    {p.projectName}
+                                    {p.projectName || p.name}
                                 </option>
                             ))}
                         </select>
@@ -256,8 +270,8 @@ export default function StockConsumption() {
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 md:p-6 mb-6">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                             <div>
-                                <h2 className="text-xl font-semibold text-gray-800">Available Stock</h2>
-                                <p className="text-gray-600">Select items from available stock to add to consumption</p>
+                                <h2 className="text-xl font-semibold text-gray-800">Available Stock & Issued Buffer</h2>
+                                <p className="text-gray-600">Select items from active issued buffer to record site consumption</p>
                             </div>
 
                             {/* SEARCH */}
@@ -291,80 +305,91 @@ export default function StockConsumption() {
                                 {/* STOCK SUMMARY */}
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                                     <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                                        <p className="text-sm text-gray-600">Total Items</p>
+                                        <p className="text-sm text-gray-600">Total Materials</p>
                                         <p className="text-2xl font-bold text-blue-600">{stockData?.stock?.length || 0}</p>
                                     </div>
-                                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                                        <p className="text-sm text-gray-600">In Stock</p>
-                                        <p className="text-2xl font-bold text-green-600">
-                                            {stockData?.stock?.filter(item => item.qty > 0).length || 0}
+                                    <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+                                        <p className="text-sm text-emerald-800">Issued to Site (Buffer)</p>
+                                        <p className="text-2xl font-bold text-emerald-700">
+                                            {stockData?.stock?.filter(item => Number(item.issuedBuffer || 0) > 0).length || 0}
                                         </p>
                                     </div>
-                                    <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                                        <p className="text-sm text-gray-600">Low Stock</p>
-                                        <p className="text-2xl font-bold text-yellow-600">
-                                            {stockData?.stock?.filter(item => item.qty > 0 && item.qty < 10).length || 0}
+                                    <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                                        <p className="text-sm text-indigo-800">Usable Store Stock</p>
+                                        <p className="text-2xl font-bold text-indigo-700">
+                                            {stockData?.stock?.filter(item => Number(item.currentBalance || item.qty || 0) > 0).length || 0}
                                         </p>
                                     </div>
                                     <div className="bg-red-50 p-4 rounded-lg border border-red-200">
                                         <p className="text-sm text-gray-600">Out of Stock</p>
                                         <p className="text-2xl font-bold text-red-600">
-                                            {stockData?.stock?.filter(item => item.qty <= 0).length || 0}
+                                            {stockData?.stock?.filter(item => Number(item.currentBalance || item.qty || 0) <= 0).length || 0}
                                         </p>
                                     </div>
                                 </div>
 
                                 {/* STOCK ITEMS GRID */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {filteredStock.map((stockItem) => (
-                                        <div
-                                            key={stockItem.itemId}
-                                            className={`border rounded-xl p-4 transition-all hover:shadow-md ${getStockStatusColor(stockItem.qty)}`}
-                                        >
-                                            <div className="flex justify-between items-start mb-3">
-                                                <div>
-                                                    <h3 className="font-semibold text-lg">{stockItem.name}</h3>
-                                                    {stockItem.category && (
-                                                        <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                                                            {stockItem.category}
-                                                        </span>
-                                                    )}
+                                    {filteredStock.map((stockItem) => {
+                                        const buffer = Number(stockItem.issuedBuffer || 0);
+                                        const storeBal = Number(stockItem.currentBalance ?? stockItem.qty ?? 0);
+                                        const canConsume = buffer > 0;
+                                        return (
+                                            <div
+                                                key={stockItem.itemId}
+                                                className={`border rounded-xl p-4 transition-all hover:shadow-md ${getStockStatusColor(buffer)}`}
+                                            >
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <div>
+                                                        <h3 className="font-semibold text-lg">{stockItem.name}</h3>
+                                                        {stockItem.category && (
+                                                            <span className="text-sm text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                                                                {stockItem.category}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-xl font-bold text-blue-700">{buffer}</div>
+                                                        <div className="text-xs text-gray-500">issued buffer ({stockItem.unit || 'units'})</div>
+                                                    </div>
                                                 </div>
-                                                <div className="text-right">
-                                                    <div className="text-xl font-bold">{stockItem.qty}</div>
-                                                    <div className="text-sm text-gray-500">units</div>
-                                                </div>
-                                            </div>
 
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    {stockItem.qty <= 0 ? (
-                                                        <span className="inline-flex items-center text-red-600">
-                                                            <FiAlertCircle className="mr-1" /> Out of Stock
-                                                        </span>
-                                                    ) : stockItem.qty < 10 ? (
-                                                        <span className="inline-flex items-center text-yellow-600">
-                                                            <FiAlertCircle className="mr-1" /> Low Stock
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center text-green-600">
-                                                            <FiCheck className="mr-1" /> In Stock
-                                                        </span>
-                                                    )}
+                                                <div className="text-xs text-gray-500 mb-3 flex justify-between border-t pt-2">
+                                                    <span>Store Balance: <strong className="text-gray-800">{storeBal} {stockItem.unit}</strong></span>
+                                                    <span>Damaged: <strong className="text-rose-600">{stockItem.damaged || 0}</strong></span>
                                                 </div>
-                                                <button
-                                                    onClick={() => addItemFromStock(stockItem)}
-                                                    disabled={stockItem.qty <= 0}
-                                                    className={`px-4 py-2 rounded-lg font-medium transition-all ${stockItem.qty > 0
-                                                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                                                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        {buffer > 0 ? (
+                                                            <span className="inline-flex items-center text-green-700 text-xs font-semibold">
+                                                                <FiCheck className="mr-1" /> Ready to Consume
+                                                            </span>
+                                                        ) : storeBal > 0 ? (
+                                                            <span className="inline-flex items-center text-amber-700 text-xs font-semibold">
+                                                                <FiAlertCircle className="mr-1" /> Issue to site first
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center text-red-600 text-xs font-semibold">
+                                                                <FiAlertCircle className="mr-1" /> Out of Stock
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <button
+                                                        onClick={() => addItemFromStock(stockItem)}
+                                                        disabled={!canConsume}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                                            canConsume
+                                                                ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                                         }`}
-                                                >
-                                                    {stockItem.qty > 0 ? 'Add to Consumption' : 'Out of Stock'}
-                                                </button>
+                                                    >
+                                                        {canConsume ? 'Add to Consumption' : buffer <= 0 && storeBal > 0 ? 'Issue Required' : 'Out of Stock'}
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </>
                         )}

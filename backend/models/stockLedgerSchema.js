@@ -12,6 +12,7 @@ const stockLedgerSchema = new mongoose.Schema({
         enum: [
             "GRN", "ISSUE", "TRANSFER", "RETURN", "CONSUMPTION",
             "TRANSFER_IN", "TRANSFER_OUT", "PROCUREMENT_RECEIPT",
+            "RECEIPT", "RETURN_RECEIPT",
             "OPENING", "DAMAGE", "ADJUSTMENT",
         ],
         required: true

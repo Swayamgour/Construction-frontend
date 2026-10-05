@@ -112,12 +112,20 @@ export default function StockOverview() {
             </div>
           </div>
 
-          <button
-            onClick={() => navigate("/MaterialRequest", { state: { selectedProjectId } })}
-            className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl shadow-lg shadow-emerald-900/20 transition-all font-medium"
-          >
-            <PlusCircle size={18} /> Add Stock
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate("/stock/operations?tab=inventory", { state: { selectedProjectId } })}
+              className="flex items-center gap-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-5 py-3 rounded-xl shadow-sm transition-all font-medium"
+            >
+              <Warehouse size={18} /> View Inventory
+            </button>
+            <button
+              onClick={() => navigate("/stock/requests", { state: { selectedProjectId } })}
+              className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl shadow-lg shadow-emerald-900/20 transition-all font-medium"
+            >
+              <PlusCircle size={18} /> Material Requests
+            </button>
+          </div>
         </div>
 
         {/* PROJECT SELECTOR */}
@@ -136,9 +144,9 @@ export default function StockOverview() {
               onChange={handleProjectChange}
               className="px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-gray-800 transition-all"
             >
-              {projects?.data?.map((p) => (
+              {(Array.isArray(projects) ? projects : projects?.data || []).map((p) => (
                 <option key={p._id} value={p._id}>
-                  {p.projectName}
+                  {p.projectName || p.name}
                 </option>
               ))}
             </select>
@@ -292,23 +300,22 @@ export default function StockOverview() {
 
                       <td className="px-6 py-4">
                         <button
-                          disabled={req.status !== "approved"}
                           onClick={() => {
-                            if (req.status === "approved") navigate(`/GRNCreate/${req._id}`);
+                            navigate(`/stock/requests`);
                           }}
-                          className={`px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors ${
+                          className={`px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors cursor-pointer shadow-md ${
                             req.status === "approved"
-                              ? "bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 cursor-pointer shadow-md shadow-emerald-900/20"
-                              : "bg-gray-300 cursor-not-allowed"
+                              ? "bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 shadow-emerald-900/20"
+                              : "bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 shadow-indigo-900/20"
                           }`}
                         >
                           {req.status === "pending"
-                            ? "Wait for Approval"
+                            ? "Review Request"
                             : req.status === "approved"
-                            ? "GRN Create"
-                            : req.status === "ordered"
-                            ? "Already Created"
-                            : "completed"}
+                            ? "Fulfill / Stock Check"
+                            : req.status === "rejected"
+                            ? "View Reason"
+                            : "View Details"}
                         </button>
                       </td>
                     </tr>

@@ -6,23 +6,25 @@ const stockSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Item",
       required: true,
+      unique: true,
+      index: true,
     },
 
-    // ⭐ Total available stock (default = 0)
+    // Total available usable stock across all locations
     quantity: {
       type: Number,
       default: 0,
       min: 0,
     },
 
-    // ⭐ Total damaged stock (default = 0)
+    // Total damaged stock across all locations
     damaged: {
       type: Number,
       default: 0,
       min: 0,
     },
 
-    // ⭐ Project-wise stock (by default empty array)
+    // Location-wise / Project-wise balances
     projectBalances: {
       type: [
         {
@@ -34,11 +36,21 @@ const stockSchema = new mongoose.Schema(
           qty: {
             type: Number,
             default: 0,
-            min: 0,
+            min: 0, // Usable stock in store/site
+          },
+          issuedBuffer: {
+            type: Number,
+            default: 0,
+            min: 0, // Issued to task/site activity, not yet consumed
+          },
+          damaged: {
+            type: Number,
+            default: 0,
+            min: 0, // Damaged stock at this project
           },
         },
       ],
-      default: [], // ⭐ very important → always create empty array
+      default: [],
     },
   },
   { timestamps: true }

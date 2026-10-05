@@ -1,126 +1,37 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { motion, AnimatePresence } from "framer-motion";
-import { ShoppingCart, Plus, X, Ban, CheckCircle2, Loader2 } from "lucide-react";
+import { ShoppingCart, Plus, Loader2, ArrowRight } from "lucide-react";
 import {
-  useGetProcurementsQuery,
-  useCreateProcurementMutation,
-  useUpdateProcurementStatusMutation,
-  useCancelProcurementMutation,
+  useGetPurchaseOrdersQuery,
+  useGetProjectsQuery,
 } from "../../Reduxe/Api";
 import { CheckRole } from "../../helper/CheckRole";
 
 const STATUS_STYLES = {
-  ordered: "bg-blue-50 text-blue-700 border-blue-200",
-  delivered: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  cancelled: "bg-rose-50 text-rose-700 border-rose-200",
-  pending: "bg-amber-50 text-amber-700 border-amber-200",
-};
-
-const NewProcurementModal = ({ onClose }) => {
-  const [form, setForm] = useState({ projectId: "", itemName: "", quantity: "", vendorName: "", expectedDeliveryDate: "" });
-  const [createProcurement, { isLoading }] = useCreateProcurementMutation();
-
-  const submit = async (e) => {
-    e.preventDefault();
-    try {
-      await createProcurement(form).unwrap();
-      toast.success("Procurement order created");
-      onClose();
-    } catch (err) {
-      toast.error(err?.data?.message || "Failed to create order");
-    }
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 10 }}
-        className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 relative"
-      >
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition-colors">
-          <X size={20} />
-        </button>
-        <div className="flex items-center gap-2 mb-5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 flex items-center justify-center text-white">
-            <ShoppingCart size={16} />
-          </div>
-          <h2 className="text-lg font-bold text-slate-900">New Procurement Order</h2>
-        </div>
-        <form onSubmit={submit} className="space-y-4">
-          {[
-            ["projectId", "Project ID"],
-            ["itemName", "Item Name"],
-            ["quantity", "Quantity"],
-            ["vendorName", "Vendor Name"],
-          ].map(([key, label]) => (
-            <div key={key}>
-              <label className="text-sm font-medium text-gray-600">{label}</label>
-              <input
-                required
-                value={form[key]}
-                onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-              />
-            </div>
-          ))}
-          <div>
-            <label className="text-sm font-medium text-gray-600">Expected Delivery Date</label>
-            <input
-              type="date"
-              value={form.expectedDeliveryDate}
-              onChange={(e) => setForm({ ...form, expectedDeliveryDate: e.target.value })}
-              className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-            />
-          </div>
-          <button
-            disabled={isLoading}
-            className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl py-2.5 text-sm font-semibold shadow-lg shadow-indigo-900/20 transition-all disabled:opacity-60"
-          >
-            {isLoading ? "Creating..." : "Create Order"}
-          </button>
-        </form>
-      </motion.div>
-    </motion.div>
-  );
+  DRAFT: "bg-gray-100 text-gray-700",
+  SUBMITTED: "bg-yellow-100 text-yellow-700",
+  APPROVED: "bg-indigo-100 text-indigo-700",
+  ORDERED: "bg-blue-100 text-blue-700",
+  PARTIALLY_RECEIVED: "bg-orange-100 text-orange-700",
+  RECEIVED: "bg-teal-100 text-teal-700",
+  CLOSED: "bg-green-100 text-green-700",
+  CANCELLED: "bg-red-100 text-red-700",
 };
 
 export default function Procurement() {
+  const navigate = useNavigate();
   const { role } = CheckRole();
-  const { data, isLoading } = useGetProcurementsQuery();
-  const [updateStatus] = useUpdateProcurementStatusMutation();
-  const [cancelProcurement] = useCancelProcurementMutation();
-  const [showNew, setShowNew] = useState(false);
+  const currentRole = String(role || "").toLowerCase();
+  const isAdmin = currentRole === "admin" || currentRole === "manager";
 
-  const orders = data?.procurements || (Array.isArray(data) ? data : []) || [];
-  const isAdmin = role === "admin";
+  const [projectId, setProjectId] = useState("");
+  const params = useMemo(() => (projectId ? { projectId } : {}), [projectId]);
 
-  const markDelivered = async (id) => {
-    const formData = new FormData();
-    formData.append("status", "delivered");
-    try {
-      await updateStatus({ id, formData }).unwrap();
-      toast.success("Marked delivered");
-    } catch (err) {
-      toast.error(err?.data?.message || "Failed");
-    }
-  };
-
-  const cancel = async (id) => {
-    try {
-      await cancelProcurement(id).unwrap();
-      toast.success("Order cancelled");
-    } catch (err) {
-      toast.error(err?.data?.message || "Failed");
-    }
-  };
+  const { data, isLoading } = useGetPurchaseOrdersQuery(params);
+  const { data: projectsData } = useGetProjectsQuery();
+  const projects = (Array.isArray(projectsData?.data) ? projectsData.data : Array.isArray(projectsData) ? projectsData : []) || [];
+  const orders = data?.data || [];
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto">
@@ -130,30 +41,65 @@ export default function Procurement() {
             <ShoppingCart size={20} />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Procurement</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Vendor purchase orders when site stock can't be fulfilled internally</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Procurement & Purchase Orders</h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Unified procurement flow for site shortages, vendor purchase orders, and goods receipts.
+            </p>
           </div>
         </div>
         {isAdmin && (
           <button
-            onClick={() => setShowNew(true)}
+            onClick={() => navigate("/PurchaseOrder")}
             className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-indigo-900/20 transition-all w-fit"
           >
-            <Plus size={18} /> New Order
+            <Plus size={18} /> New Purchase Order
           </button>
         )}
+      </div>
+
+      {/* Info card */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-xs text-blue-900 flex items-start justify-between gap-4">
+        <div>
+          <span className="font-semibold block mb-0.5">Single Source Procurement Flow:</span>
+          <span>
+            When Stock Check identifies a shortage, procurement proceeds via canonical Purchase Orders with explicit delivery routing (Central Godown vs Direct Site).
+          </span>
+        </div>
+        <button
+          onClick={() => navigate("/purchase-orders")}
+          className="shrink-0 flex items-center gap-1 font-semibold text-blue-700 hover:text-blue-900 underline"
+        >
+          Full PO Management <ArrowRight size={13} />
+        </button>
+      </div>
+
+      {/* Project Filter */}
+      <div className="flex gap-3 mb-6">
+        <select
+          value={projectId}
+          onChange={(e) => setProjectId(e.target.value)}
+          className="border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">All Projects</option>
+          {projects.map((p) => (
+            <option key={p._id} value={p._id}>
+              {p.projectName || p.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {isLoading && (
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-500">
           <Loader2 className="animate-spin" size={22} />
-          <p className="text-sm">Loading orders...</p>
+          <p className="text-sm">Loading procurement orders...</p>
         </div>
       )}
+
       {!isLoading && orders.length === 0 && (
         <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-200">
           <ShoppingCart className="mx-auto text-gray-300 mb-3" size={36} />
-          <p className="text-gray-500 text-sm">No procurement orders yet</p>
+          <p className="text-gray-500 text-sm">No procurement orders found</p>
         </div>
       )}
 
@@ -163,43 +109,57 @@ export default function Procurement() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50/70 text-gray-500 text-xs uppercase tracking-wide">
                 <tr>
-                  <th className="px-4 py-3 text-left font-semibold">Item</th>
+                  <th className="px-4 py-3 text-left font-semibold">PO #</th>
+                  <th className="px-4 py-3 text-left font-semibold">Project</th>
+                  <th className="px-4 py-3 text-left font-semibold">Routing</th>
                   <th className="px-4 py-3 text-left font-semibold">Vendor</th>
-                  <th className="px-4 py-3 text-left font-semibold">Qty</th>
+                  <th className="px-4 py-3 text-left font-semibold">Grand Total</th>
                   <th className="px-4 py-3 text-left font-semibold">Status</th>
-                  <th className="px-4 py-3 text-left font-semibold">Actions</th>
+                  <th className="px-4 py-3 text-left font-semibold">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {orders.map((o) => (
                   <tr key={o._id} className="hover:bg-indigo-50/30 transition-colors">
-                    <td className="px-4 py-3 font-semibold text-slate-800">{o.itemName}</td>
-                    <td className="px-4 py-3 text-gray-600">{o.vendorName}</td>
-                    <td className="px-4 py-3 text-gray-600">{o.quantity}</td>
+                    <td className="px-4 py-3 font-semibold text-blue-600">
+                      {o.poNumber || o._id.slice(-8).toUpperCase()}
+                    </td>
+                    <td className="px-4 py-3 text-gray-800 font-medium">
+                      {o.projectId?.projectName || o.projectId?.name || "-"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {o.deliveryType === "DIRECT_PROJECT_SITE" ? (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                          Direct Site
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                          Central Godown
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {o.vendorId?.companyName || o.vendorId?.name || "-"}
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-gray-900">
+                      ₹{Number(o.grandTotal || 0).toLocaleString()}
+                    </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${STATUS_STYLES[o.status] || "bg-gray-50 text-gray-600 border-gray-200"}`}
+                        className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                          STATUS_STYLES[o.status] || "bg-gray-50 text-gray-600 border-gray-200"
+                        }`}
                       >
-                        {o.status || "pending"}
+                        {o.status || "DRAFT"}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {isAdmin && o.status !== "delivered" && o.status !== "cancelled" && (
-                        <div className="flex gap-3">
-                          <button
-                            onClick={() => markDelivered(o._id)}
-                            className="text-emerald-700 text-xs font-semibold hover:underline flex items-center gap-1"
-                          >
-                            <CheckCircle2 size={12} /> Mark Delivered
-                          </button>
-                          <button
-                            onClick={() => cancel(o._id)}
-                            className="text-rose-600 text-xs font-semibold hover:underline inline-flex items-center gap-1"
-                          >
-                            <Ban size={12} /> Cancel
-                          </button>
-                        </div>
-                      )}
+                      <button
+                        onClick={() => navigate("/purchase-orders")}
+                        className="text-xs font-semibold text-blue-600 hover:underline"
+                      >
+                        View in PO List
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -208,8 +168,6 @@ export default function Procurement() {
           </div>
         </div>
       )}
-
-      <AnimatePresence>{showNew && <NewProcurementModal onClose={() => setShowNew(false)} />}</AnimatePresence>
     </div>
   );
 }

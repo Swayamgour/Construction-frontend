@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useMemo, useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
     useGetProjectsQuery,
@@ -21,6 +21,8 @@ const emptyRow = () => ({
 
 const PurchaseOrder = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const prefill = location.state || {};
 
     const { data: projectsData, isLoading: projectsLoading } = useGetProjectsQuery();
     const { data: vendorsData, isLoading: vendorsLoading } = useGetVendorsQuery();
@@ -28,18 +30,54 @@ const PurchaseOrder = () => {
     const [createPurchaseOrder, { isLoading: saving }] = useCreatePurchaseOrderMutation();
 
     const projects = projectsData?.data || projectsData || [];
+    const projectList = Array.isArray(projects) ? projects : projects?.data || [];
     const vendors = vendorsData?.data || vendorsData || [];
+    const vendorList = Array.isArray(vendors) ? vendors : vendors?.data || [];
     const items = itemsData?.data || itemsData || [];
+    const itemList = Array.isArray(items) ? items : items?.data || [];
 
-    const [projectId, setProjectId] = useState("");
+    const [projectId, setProjectId] = useState(prefill.prefillProjectId || "");
     const [vendorId, setVendorId] = useState("");
     const [expectedDeliveryDate, setExpectedDeliveryDate] = useState("");
-    const [materials, setMaterials] = useState([emptyRow()]);
+    const [deliveryType, setDeliveryType] = useState("CENTRAL_GODOWN");
+    const [deliveryProject, setDeliveryProject] = useState(prefill.prefillProjectId || "");
+    const [stockRequestId, setStockRequestId] = useState(prefill.prefillStockRequestId || "");
+    const [materials, setMaterials] = useState(() => {
+        if (prefill.prefillItems?.length > 0) {
+            return prefill.prefillItems.map((it) => ({
+                rowId: Date.now() + Math.random(),
+                itemId: it.itemId || "",
+                qty: it.qty || "",
+                unit: it.unit || "",
+                rate: "",
+                tax: 0,
+                discount: 0,
+            }));
+        }
+        return [emptyRow()];
+    });
 
     const itemById = useMemo(
-        () => Object.fromEntries(items.map((it) => [it._id, it])),
-        [items]
+        () => Object.fromEntries(itemList.map((it) => [it._id, it])),
+        [itemList]
     );
+
+    // Auto populate units/rates when items data loads for prefilled items
+    useEffect(() => {
+        if (itemList.length > 0) {
+            setMaterials((prev) =>
+                prev.map((r) => {
+                    if (r.itemId && !r.unit) {
+                        const it = itemById[r.itemId];
+                        if (it) {
+                            return { ...r, unit: it.unit || "", rate: r.rate || it.price || "" };
+                        }
+                    }
+                    return r;
+                })
+            );
+        }
+    }, [itemList, itemById]);
 
     const handleRowChange = (rowId, field, value) => {
         setMaterials((prev) =>
@@ -61,8 +99,6 @@ const PurchaseOrder = () => {
     const removeRow = (rowId) =>
         setMaterials((prev) => (prev.length > 1 ? prev.filter((r) => r.rowId !== rowId) : prev));
 
-    // Mirrors calc()/totals() in backend/controllers/purchaseOrderController.js
-    // so the numbers shown here match exactly what gets saved.
     const computed = useMemo(() => {
         const rows = materials.map((row) => {
             const qty = Number(row.qty || 0);
@@ -84,6 +120,9 @@ const PurchaseOrder = () => {
     const validate = () => {
         if (!projectId) return "Project select karein";
         if (!vendorId) return "Vendor select karein";
+        if (deliveryType === "DIRECT_PROJECT_SITE" && !deliveryProject && !projectId) {
+            return "Direct Site delivery ke liye destination project select karein";
+        }
         const validRows = materials.filter((r) => r.itemId);
         if (!validRows.length) return "Kam se kam ek material item add karein";
         for (const r of validRows) {
@@ -102,6 +141,9 @@ const PurchaseOrder = () => {
         const payload = {
             projectId,
             vendorId,
+            deliveryType,
+            deliveryProject: deliveryType === "DIRECT_PROJECT_SITE" ? (deliveryProject || projectId) : undefined,
+            stockRequestId: stockRequestId || undefined,
             expectedDeliveryDate: expectedDeliveryDate || undefined,
             items: materials
                 .filter((r) => r.itemId)
@@ -126,28 +168,42 @@ const PurchaseOrder = () => {
     return (
         <div className="min-h-screen bg-gray-50 p-6">
             <div className="max-w-6xl mx-auto bg-white p-6 shadow-md rounded-xl">
-                <h2 className="text-2xl font-semibold mb-4">New Purchase Order</h2>
-                <p className="text-sm text-gray-500 mb-4">
-                    PO <span className="font-medium">DRAFT</span> status me create hota hai — baad me
-                    Purchase Orders list se Submit / Approve / Order kar sakte hain.
-                </p>
+                <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
+                    <div>
+                        <h2 className="text-2xl font-semibold">New Purchase Order</h2>
+                        <p className="text-sm text-gray-500 mt-1">
+                            PO <span className="font-medium">DRAFT</span> status me create hota hai — baad me
+                            Purchase Orders list se Submit / Approve / Order kar sakte hain.
+                        </p>
+                    </div>
+                    {stockRequestId && (
+                        <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs px-3 py-1.5 rounded-lg font-medium">
+                            Linked to Material Request #{stockRequestId.slice(-6).toUpperCase()}
+                        </div>
+                    )}
+                </div>
+
                 <div className="grid md:grid-cols-3 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
                         <select
                             className="w-full border border-gray-300 rounded-lg px-3 py-2"
                             value={projectId}
-                            onChange={(e) => setProjectId(e.target.value)}
+                            onChange={(e) => {
+                                setProjectId(e.target.value);
+                                if (!deliveryProject) setDeliveryProject(e.target.value);
+                            }}
                             disabled={projectsLoading}
                         >
                             <option value="">Select Project</option>
-                            {projects?.data?.map((p) => (
+                            {projectList.map((p) => (
                                 <option key={p._id} value={p._id}>
                                     {p.projectName || p.name}
                                 </option>
                             ))}
                         </select>
                     </div>
+
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Vendor</label>
                         <select
@@ -157,13 +213,14 @@ const PurchaseOrder = () => {
                             disabled={vendorsLoading}
                         >
                             <option value="">Select Vendor</option>
-                            {vendors.map((v) => (
+                            {vendorList.map((v) => (
                                 <option key={v._id} value={v._id}>
                                     {v.companyName || v.name}
                                 </option>
                             ))}
                         </select>
                     </div>
+
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Expected Delivery By
@@ -176,7 +233,76 @@ const PurchaseOrder = () => {
                         />
                     </div>
                 </div>
+
+                {/* Delivery Destination Routing Section */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mt-5">
+                    <label className="block text-sm font-semibold text-slate-800 mb-2">
+                        Delivery Destination Routing
+                    </label>
+                    <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                        <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${deliveryType === "CENTRAL_GODOWN"
+                            ? "bg-white border-blue-600 ring-2 ring-blue-500/20 shadow-sm"
+                            : "bg-white/70 border-gray-200 hover:bg-white"
+                            }`}>
+                            <input
+                                type="radio"
+                                name="deliveryType"
+                                value="CENTRAL_GODOWN"
+                                checked={deliveryType === "CENTRAL_GODOWN"}
+                                onChange={() => setDeliveryType("CENTRAL_GODOWN")}
+                                className="mt-1 text-blue-600 focus:ring-blue-500"
+                            />
+                            <div>
+                                <span className="font-semibold text-slate-800 block">Central Godown / Main Store</span>
+                                <span className="text-xs text-slate-500 block mt-0.5">
+                                    Goods arrive at central godown. GRN credits central stock, which is later transferred to projects.
+                                </span>
+                            </div>
+                        </label>
+
+                        <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${deliveryType === "DIRECT_PROJECT_SITE"
+                            ? "bg-white border-blue-600 ring-2 ring-blue-500/20 shadow-sm"
+                            : "bg-white/70 border-gray-200 hover:bg-white"
+                            }`}>
+                            <input
+                                type="radio"
+                                name="deliveryType"
+                                value="DIRECT_PROJECT_SITE"
+                                checked={deliveryType === "DIRECT_PROJECT_SITE"}
+                                onChange={() => setDeliveryType("DIRECT_PROJECT_SITE")}
+                                className="mt-1 text-blue-600 focus:ring-blue-500"
+                            />
+                            <div>
+                                <span className="font-semibold text-slate-800 block">Direct Project Site</span>
+                                <span className="text-xs text-slate-500 block mt-0.5">
+                                    Vendor delivers directly to project site. GRN credits project stock directly (bypasses central godown).
+                                </span>
+                            </div>
+                        </label>
+                    </div>
+
+                    {deliveryType === "DIRECT_PROJECT_SITE" && (
+                        <div className="mt-3">
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                Destination Project Site <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                                className="w-full sm:w-80 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                                value={deliveryProject || projectId}
+                                onChange={(e) => setDeliveryProject(e.target.value)}
+                            >
+                                <option value="">Select Destination Project</option>
+                                {projectList.map((p) => (
+                                    <option key={p._id} value={p._id}>
+                                        {p.projectName || p.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                </div>
             </div>
+
 
             <div className="max-w-6xl mx-auto bg-white p-6 shadow-md rounded-xl mt-6">
                 <div className="flex justify-between items-center mb-4">
@@ -205,6 +331,7 @@ const PurchaseOrder = () => {
                                 <tr key={row.rowId} className="text-center">
                                     <td className="border p-2">{index + 1}</td>
                                     <td className="border p-2 text-left">
+                                        {/* {console.log(computed, items)} */}
                                         <select
                                             className="border rounded-lg px-2 py-1 w-full"
                                             value={row.itemId}
@@ -212,7 +339,7 @@ const PurchaseOrder = () => {
                                             disabled={itemsLoading}
                                         >
                                             <option value="">Select item</option>
-                                            {items.map((it) => (
+                                            {items?.items?.map((it) => (
                                                 <option key={it._id} value={it._id}>
                                                     {it.name}
                                                 </option>

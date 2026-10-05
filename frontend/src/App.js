@@ -719,14 +719,42 @@ function App() {
 
         <Route path="/MaterialRequest" element={
           <Layout >
-            <MaterialRequest />
+            <StockRequests />
           </Layout>
         }
         />
 
         <Route path="/MaterialApproval" element={
           <Layout >
-            <MaterialApproval />
+            <StockRequests />
+          </Layout>
+        }
+        />
+
+        <Route path="/material-requests" element={
+          <Layout >
+            <StockRequests />
+          </Layout>
+        }
+        />
+
+        <Route path="/stock-requests" element={
+          <Layout >
+            <StockRequests />
+          </Layout>
+        }
+        />
+
+        <Route path="/StockOperations" element={
+          <Layout >
+            <StockOperations />
+          </Layout>
+        }
+        />
+
+        <Route path="/purchase-orders/create" element={
+          <Layout >
+            <PurchaseOrder />
           </Layout>
         }
         />

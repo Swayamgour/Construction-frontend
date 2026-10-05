@@ -336,7 +336,12 @@ const LabourDetail = () => {
           </button>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 font-mono">ID: {labour._id}</span>
+            {labour.labourId && (
+              <span className="text-xs font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg shadow-sm">
+                Labour ID: {labour.labourId}
+              </span>
+            )}
+            <span className="text-xs text-slate-400 font-mono">DB: {labour._id}</span>
           </div>
         </div>
 
@@ -367,6 +372,11 @@ const LabourDetail = () => {
                   <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
                     {labour.name}
                   </h1>
+                  {labour.labourId && (
+                    <span className="px-2.5 py-1 rounded-xl text-xs font-mono font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 shadow-sm">
+                      {labour.labourId}
+                    </span>
+                  )}
                   {labour.fatherName && (
                     <span className="text-sm text-slate-500 font-medium">
                       (S/o {labour.fatherName})
@@ -578,6 +588,17 @@ const LabourDetail = () => {
                     Personal Information
                   </h3>
                   <div className="space-y-3 text-sm">
+                    {labour.labourId && (
+                      <div className="bg-gradient-to-r from-indigo-50/80 to-blue-50/60 p-3 rounded-xl border border-indigo-200/80 flex items-center justify-between">
+                        <div>
+                          <span className="text-[11px] text-indigo-700 font-semibold block uppercase tracking-wider">Labour Unique ID</span>
+                          <span className="font-mono font-bold text-base text-indigo-950">{labour.labourId}</span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-200/60 text-indigo-800 border border-indigo-300 uppercase">
+                          Serial
+                        </span>
+                      </div>
+                    )}
                     <div className="bg-white p-3 rounded-xl border border-slate-200/80">
                       <span className="text-xs text-slate-400 block">Full Name</span>
                       <span className="font-semibold text-slate-800">{labour.name}</span>

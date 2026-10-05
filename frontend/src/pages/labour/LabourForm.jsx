@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { useAddLabourMutation, useUpdateLabourMutation, useGetLabourByIdQuery } from "../../Reduxe/Api";
+import {
+  useAddLabourMutation,
+  useUpdateLabourMutation,
+  useGetLabourByIdQuery,
+  useGetNextLabourIdQuery,
+} from "../../Reduxe/Api";
 import { motion } from "framer-motion";
-import { X, Save, User, Phone, MapPin, HardHat, Wallet, Gauge, Loader2 } from "lucide-react";
+import { X, Save, User, Phone, MapPin, HardHat, Wallet, Gauge, Loader2, Sparkles, Fingerprint } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
@@ -12,6 +17,8 @@ const selectCls =
 
 const LabourForm = ({ labourId, onClose, onSave }) => {
   const { data: labourData } = useGetLabourByIdQuery(labourId, { skip: !labourId });
+  const isEditMode = !!labourId;
+  const { data: nextIdData } = useGetNextLabourIdQuery(undefined, { skip: isEditMode });
 
   const [addLabour] = useAddLabourMutation();
   const [updateLabour] = useUpdateLabourMutation();
@@ -19,6 +26,7 @@ const LabourForm = ({ labourId, onClose, onSave }) => {
   const navigate = useNavigate();
 
   const initialState = {
+    labourId: "",
     name: "",
     labourType: "Permanent Labour",
     category: "Labour",
@@ -35,13 +43,12 @@ const LabourForm = ({ labourId, onClose, onSave }) => {
   const [formData, setFormData] = useState(initialState);
   const [isLoading, setIsLoading] = useState(false);
 
-  const isEditMode = !!labourId;
-
   useEffect(() => {
     if (labourData?.data && isEditMode) {
       const labour = labourData.data;
       setFormData({
         ...labour,
+        labourId: labour.labourId || "",
         projectAssigned: labour.projectAssigned?._id || "",
         dailyWage: labour.dailyWage?.toString() || "",
         monthlySalary: labour.monthlySalary?.toString() || "",
@@ -98,14 +105,16 @@ const LabourForm = ({ labourId, onClose, onSave }) => {
         toast.success("Updated Successfully");
         navigate(-1);
       } else {
-        await addLabour({
+        const payload = {
           ...formData,
+          labourId: formData.labourId || nextIdData?.nextLabourId || undefined,
           dailyWage: Number(formData.dailyWage),
           monthlySalary: Number(formData.monthlySalary),
           projectAssigned: formData.projectAssigned || null,
-        }).unwrap();
-
-        toast.success("Added Successfully");
+        };
+        const res = await addLabour(payload).unwrap();
+        const assignedId = res?.labour?.labourId || payload.labourId || "";
+        toast.success(`Worker Added Successfully ${assignedId ? `(${assignedId})` : ""}`);
         navigate(-1);
       }
 
@@ -121,6 +130,10 @@ const LabourForm = ({ labourId, onClose, onSave }) => {
     }
   };
 
+  const displayLabourId = isEditMode
+    ? formData.labourId || "LAB-CON-..."
+    : nextIdData?.nextLabourId || "LAB-CON-001 (Auto)";
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <motion.div
@@ -133,7 +146,10 @@ const LabourForm = ({ labourId, onClose, onSave }) => {
             <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center">
               <HardHat size={18} />
             </div>
-            <h2 className="text-xl font-bold">{isEditMode ? "Edit Worker" : "Add New Worker"}</h2>
+            <div>
+              <h2 className="text-xl font-bold">{isEditMode ? "Edit Worker" : "Add New Worker"}</h2>
+              <p className="text-xs text-indigo-100 mt-0.5">Unique Serial ID: {displayLabourId}</p>
+            </div>
           </div>
           <button onClick={() => navigate(-1)} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
             <X size={20} />
@@ -142,6 +158,31 @@ const LabourForm = ({ labourId, onClose, onSave }) => {
 
         <div className="p-6 overflow-y-auto max-h-[80vh]">
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* UNIQUE LABOUR ID BANNER */}
+            <div className="bg-gradient-to-r from-indigo-50/80 via-blue-50/60 to-purple-50/50 border border-indigo-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/25 shrink-0">
+                  <Fingerprint size={20} />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider block">
+                    Labour Unique ID ({isEditMode ? "Assigned ID" : "Auto-Generated Serial"})
+                  </span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-lg font-mono font-bold text-slate-900 tracking-wide">
+                      {displayLabourId}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 uppercase">
+                      {isEditMode ? "Fixed ID" : "Serial Wise"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-500 sm:text-right max-w-xs leading-relaxed">
+                Unique serial ID assigned sequentially for all site attendance, transfers, and ledger tracking.
+              </p>
+            </div>
+
             {/* NAME + PHONE */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
