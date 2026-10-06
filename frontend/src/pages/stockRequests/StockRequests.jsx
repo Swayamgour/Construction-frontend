@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckRole } from "../../helper/CheckRole";
+import { getPermissions } from "../../helper/permissions";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -60,8 +61,9 @@ const inputCls =
 const StockRequests = () => {
   const navigate = useNavigate();
   const { role: userRole } = CheckRole();
-  const currentRole = String(userRole || "").toLowerCase();
-  const isAdmin = currentRole === "admin";
+  const permissions = getPermissions(userRole);
+  const currentRole = permissions.role;
+  const isAdmin = permissions.isAdmin;
 
   const [showCreate, setShowCreate] = useState(false);
   const [reviewModal, setReviewModal] = useState(null); // request doc
@@ -739,7 +741,7 @@ const StockRequests = () => {
                                 </span>
                               )}
                             </td>
-                            {isAdmin && reviewModal.status === "APPROVED" && (
+                            {permissions.stock.canTransfer && reviewModal.status === "APPROVED" && (
                               <td className="p-2.5 text-right space-x-1">
                                 {it.availableQty > 0 && (
                                   <button
@@ -758,10 +760,11 @@ const StockRequests = () => {
                   </div>
                 </div>
 
-                {/* Admin Actions */}
-                {isAdmin && (
-                  <div className="pt-3 border-t flex flex-wrap gap-2 justify-end items-center">
-                    {reviewModal.status === "PENDING_APPROVAL" || reviewModal.status === "PENDING_ADMIN_REVIEW" ? (
+                {/* Role-Specific Actions */}
+                <div className="pt-3 border-t flex flex-wrap gap-2 justify-end items-center">
+                  {/* Admin Approval / Rejection */}
+                  {permissions.stock.canApproveRequest &&
+                    (reviewModal.status === "PENDING_APPROVAL" || reviewModal.status === "PENDING_ADMIN_REVIEW") && (
                       <>
                         <button
                           type="button"
@@ -782,36 +785,37 @@ const StockRequests = () => {
                           Approve &amp; Check Stock
                         </button>
                       </>
-                    ) : reviewModal.status === "APPROVED" ? (
-                      <>
-                        {/* Check if any shortage exists */}
-                        {(reviewModal.items || []).some((i) => (i.shortageQty || 0) > 0) && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigate("/PurchaseOrder", {
-                                state: {
-                                  prefillProjectId: reviewModal.projectId?._id || reviewModal.projectId,
-                                  prefillStockRequestId: reviewModal._id,
-                                  prefillItems: (reviewModal.items || [])
-                                    .filter((i) => (i.shortageQty || 0) > 0)
-                                    .map((i) => ({
-                                      itemId: i.itemId?._id || i.itemId,
-                                      qty: i.shortageQty,
-                                      unit: i.unit,
-                                    })),
-                                },
-                              });
-                            }}
-                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm"
-                          >
-                            <ShoppingCart size={14} /> Create Purchase Order for Shortage
-                          </button>
-                        )}
-                      </>
-                    ) : null}
-                  </div>
-                )}
+                    )}
+
+                  {/* Manager Procurement Creation for Shortages */}
+                  {permissions.purchase.canCreatePO && reviewModal.status === "APPROVED" && (
+                    <>
+                      {(reviewModal.items || []).some((i) => (i.shortageQty || 0) > 0) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigate("/PurchaseOrder", {
+                              state: {
+                                prefillProjectId: reviewModal.projectId?._id || reviewModal.projectId,
+                                prefillStockRequestId: reviewModal._id,
+                                prefillItems: (reviewModal.items || [])
+                                  .filter((i) => (i.shortageQty || 0) > 0)
+                                  .map((i) => ({
+                                    itemId: i.itemId?._id || i.itemId,
+                                    qty: i.shortageQty,
+                                    unit: i.unit,
+                                  })),
+                              },
+                            });
+                          }}
+                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                        >
+                          <ShoppingCart size={14} /> Create Purchase Order for Shortage
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             </motion.div>
           </motion.div>

@@ -43,6 +43,7 @@ import {
 } from "../../Reduxe/Api";
 import { getInitials, getAvatarGradient } from "../../helper/avatar";
 import { CheckRole } from "../../helper/CheckRole";
+import { getPermissions } from "../../helper/permissions";
 import toast from "react-hot-toast";
 
 const STAT_STYLES = {
@@ -59,7 +60,8 @@ const PAGE_SIZE_OPTIONS = [10, 20, 50];
 export default function LabourDashboard() {
   const navigate = useNavigate();
   const { role } = CheckRole();
-  const isSuperOrAdmin = ["admin", "manager"].includes(role?.toLowerCase());
+  const permissions = getPermissions(role);
+  const canManageLabour = permissions.labour.canCreate;
 
   // Data fetching
   const { data: labourData, isLoading, isError, refetch } = useGetLabourQuery();
@@ -311,7 +313,7 @@ export default function LabourDashboard() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {isSuperOrAdmin && (
+          {canManageLabour && (
             <button
               onClick={() => navigate("/LabourForm")}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl font-semibold shadow-md shadow-indigo-600/20 text-sm transition active:scale-95"
@@ -711,7 +713,7 @@ export default function LabourDashboard() {
                             </Link>
 
                             {/* Edit */}
-                            {isSuperOrAdmin && (
+                            {canManageLabour && (
                               <button
                                 onClick={() => navigate(`/LabourForm?id=${labour._id}`)}
                                 title="Edit Labour"
@@ -720,10 +722,9 @@ export default function LabourDashboard() {
                                 <Edit size={16} />
                               </button>
                             )}
-                            {/* {console.log(isSuperOrAdmin, isAssigned, labour.status)} */}
 
                             {/* Transfer (if assigned) */}
-                            {isSuperOrAdmin && isAssigned && (
+                            {canManageLabour && isAssigned && (
                               <button
                                 onClick={() => handleOpenTransferModal(labour)}
                                 title="Transfer to Another Site"
@@ -734,7 +735,7 @@ export default function LabourDashboard() {
                             )}
 
                             {/* Release (if assigned) */}
-                            {isSuperOrAdmin && isAssigned && (
+                            {canManageLabour && isAssigned && (
                               <button
                                 onClick={() => handleOpenReleaseModal(labour)}
                                 title="Release back to Unassigned"
@@ -745,7 +746,7 @@ export default function LabourDashboard() {
                             )}
 
                             {/* Deactivate / Activate */}
-                            {isSuperOrAdmin && (
+                            {canManageLabour && (
                               <button
                                 onClick={() => handleToggleStatus(labour)}
                                 title={labour.status === "Active" ? "Deactivate" : "Activate"}

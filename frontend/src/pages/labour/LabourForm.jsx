@@ -9,6 +9,8 @@ import { motion } from "framer-motion";
 import { X, Save, User, Phone, MapPin, HardHat, Wallet, Gauge, Loader2, Sparkles, Fingerprint } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { CheckRole } from "../../helper/CheckRole";
+import { getPermissions } from "../../helper/permissions";
 
 const inputCls =
   "w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all";
@@ -16,6 +18,17 @@ const selectCls =
   "w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all";
 
 const LabourForm = ({ labourId, onClose, onSave }) => {
+  const navigate = useNavigate();
+  const { role } = CheckRole();
+  const permissions = getPermissions(role);
+
+  useEffect(() => {
+    if (permissions.isAdmin) {
+      toast.error("Admins have view & monitoring access only. Labour profile management is an operational manager task.");
+      navigate("/LabourDashboard", { replace: true });
+    }
+  }, [permissions.isAdmin, navigate]);
+
   const { data: labourData } = useGetLabourByIdQuery(labourId, { skip: !labourId });
   const isEditMode = !!labourId;
   const { data: nextIdData } = useGetNextLabourIdQuery(undefined, { skip: isEditMode });

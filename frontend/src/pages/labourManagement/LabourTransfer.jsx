@@ -14,6 +14,9 @@ import {
   useGetLabourAssignmentHistoryQuery,
 } from "../../Reduxe/Api";
 
+import { CheckRole } from "../../helper/CheckRole";
+import { getPermissions } from "../../helper/permissions";
+
 const MODE_META = {
   assign: { icon: UserPlus2, chip: "from-indigo-600 to-blue-600" },
   transfer: { icon: ArrowRightLeft, chip: "from-violet-600 to-purple-600" },
@@ -24,6 +27,17 @@ const inputCls =
   "border border-gray-200 p-2.5 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-sm";
 
 const LabourTransfer = () => {
+  const navigate = useNavigate();
+  const { role } = CheckRole();
+  const permissions = getPermissions(role);
+
+  React.useEffect(() => {
+    if (permissions.isAdmin) {
+      toast.error("Admins have view & monitoring access only. Labour transfers are executed by Managers.");
+      navigate("/labour/full-history", { replace: true });
+    }
+  }, [permissions.isAdmin, navigate]);
+
   const { data: labourResp } = useGetLabourQuery();
   const { data: projectResp } = useGetProjectsQuery();
   const { data: assignmentResp, refetch } = useGetLabourAssignmentsQuery({});

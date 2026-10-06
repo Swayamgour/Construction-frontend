@@ -7,6 +7,8 @@ import {
     useGetAllItemsQuery,
     useCreatePurchaseOrderMutation,
 } from "../Reduxe/Api";
+import { CheckRole } from "../helper/CheckRole";
+import { hasModulePermission } from "../helper/permissions";
 
 // One blank material row for the PO items table.
 const emptyRow = () => ({
@@ -23,6 +25,14 @@ const PurchaseOrder = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const prefill = location.state || {};
+    const { role } = CheckRole();
+
+    useEffect(() => {
+        if (role && !hasModulePermission(role, "purchase", "canCreatePO")) {
+            toast.error("Admins review and approve purchase orders. Operational creation is reserved for Managers.");
+            navigate("/purchase-orders", { replace: true });
+        }
+    }, [role, navigate]);
 
     const { data: projectsData, isLoading: projectsLoading } = useGetProjectsQuery();
     const { data: vendorsData, isLoading: vendorsLoading } = useGetVendorsQuery();

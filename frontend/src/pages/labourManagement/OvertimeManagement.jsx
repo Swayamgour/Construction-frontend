@@ -10,8 +10,12 @@ import {
   useCorrectOvertimeMutation,
   useGetProjectsQuery,
 } from "../../Reduxe/Api";
+import { CheckRole } from "../../helper/CheckRole";
+import { getPermissions } from "../../helper/permissions";
 
 const OvertimeManagement = () => {
+  const { role } = CheckRole();
+  const permissions = getPermissions(role);
   const { data: projectResp } = useGetProjectsQuery();
   const [filters, setFilters] = useState({ projectId: "", status: "" });
 
@@ -107,7 +111,7 @@ const OvertimeManagement = () => {
       header: "Action",
       render: (row) => (
         <div className="flex gap-2 items-center">
-          {row.overtimeApprovalStatus === "Pending" && (
+          {permissions.labour.canApproveOvertime && row.overtimeApprovalStatus === "Pending" && (
             <>
               <button
                 onClick={() => handleApprove(row._id)}
@@ -123,13 +127,18 @@ const OvertimeManagement = () => {
               </button>
             </>
           )}
-          <button
-            onClick={() => openCorrect(row)}
-            title="Correct check-in/out"
-            className="px-2.5 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs flex items-center gap-1 hover:bg-gray-50 transition-colors"
-          >
-            <Pencil size={11} /> Correct
-          </button>
+          {permissions.labour.canApplyOvertime && (
+            <button
+              onClick={() => openCorrect(row)}
+              title="Correct check-in/out"
+              className="px-2.5 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs flex items-center gap-1 hover:bg-gray-50 transition-colors"
+            >
+              <Pencil size={11} /> Correct
+            </button>
+          )}
+          {permissions.isAdmin && row.overtimeApprovalStatus !== "Pending" && (
+            <span className="text-xs text-slate-400 font-medium">Reviewed</span>
+          )}
         </div>
       ),
     },

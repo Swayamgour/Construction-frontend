@@ -17,9 +17,20 @@ import { BiRupee } from "react-icons/bi";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import toast from "react-hot-toast";
+import { CheckRole } from "../helper/CheckRole";
+import { getPermissions } from "../helper/permissions";
 
 const AddNewLabour = () => {
     const navigate = useNavigate();
+    const { role } = CheckRole();
+    const permissions = getPermissions(role);
+
+    React.useEffect(() => {
+        if (permissions.isAdmin) {
+            toast.error("Admins have view & monitoring access only. Labour profile creation is an operational manager task.");
+            navigate("/LabourDashboard", { replace: true });
+        }
+    }, [permissions.isAdmin, navigate]);
 
     const [formData, setFormData] = useState({
         // ✅ 1. Personal Information

@@ -24,6 +24,8 @@ import {
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { CheckRole } from "../../helper/CheckRole";
+import { hasModulePermission } from "../../helper/permissions";
 
 export default function Tasks() {
     const { data, isLoading, refetch } = useGetTasksQuery();
@@ -37,7 +39,10 @@ export default function Tasks() {
     const [depsInput, setDepsInput] = useState(""); // comma-separated task IDs
     const navigate = useNavigate();
 
-    const userRole = localStorage.getItem("role");
+    const { role } = CheckRole();
+    const canAssign = hasModulePermission(role, "task", "canAssign");
+    const canEdit = hasModulePermission(role, "task", "canEdit");
+    const canDelete = hasModulePermission(role, "task", "canDelete");
 
     const handleStatus = async (task, status) => {
         await updateStatus({ id: task._id, status });
@@ -139,13 +144,15 @@ export default function Tasks() {
                         </p>
                     </div>
                     
-                    <button 
-                        onClick={() => navigate('/AssignTask')}
-                        className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
-                    >
-                        <FiPlus size={20} />
-                        Assign New Task
-                    </button>
+                    {canAssign && (
+                        <button 
+                            onClick={() => navigate('/AssignTask')}
+                            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                        >
+                            <FiPlus size={20} />
+                            Assign New Task
+                        </button>
+                    )}
                 </div>
 
                 {/* Stats Cards */}
@@ -309,22 +316,26 @@ export default function Tasks() {
                                         )}
                                     </div>
 
-                                    {(userRole === "admin" || userRole === "manager") && (
+                                    {(canEdit || canDelete) && (
                                         <div className="flex items-center gap-1">
-                                            <button
-                                                onClick={() => openEdit(task)}
-                                                className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                                                title="Edit Priority / Dependencies"
-                                            >
-                                                <FiEdit3 size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(task)}
-                                                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                title="Delete Task"
-                                            >
-                                                <FiTrash2 size={16} />
-                                            </button>
+                                            {canEdit && (
+                                                <button
+                                                    onClick={() => openEdit(task)}
+                                                    className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                                                    title="Edit Priority / Dependencies"
+                                                >
+                                                    <FiEdit3 size={16} />
+                                                </button>
+                                            )}
+                                            {canDelete && (
+                                                <button
+                                                    onClick={() => handleDelete(task)}
+                                                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="Delete Task"
+                                                >
+                                                    <FiTrash2 size={16} />
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -350,7 +361,7 @@ export default function Tasks() {
                                 : "Get started by assigning your first task"
                             }
                         </p>
-                        {(userRole === "admin" || userRole === "manager") && (
+                        {canAssign && (
                             <button 
                                 onClick={() => navigate('/AssignTask')}
                                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"

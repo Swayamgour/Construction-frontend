@@ -31,8 +31,16 @@ export default function AssignTask() {
     const { role } = CheckRole();
     const navigate = useNavigate();
 
-    // Determine which project data to use based on role
-    const projectData = allProjects
+    // Guard: Admin monitors tasks, only Managers/Supervisors assign them
+    useEffect(() => {
+        if (role && String(role).toLowerCase() === "admin") {
+            toast.error("Admins monitor tasks. Operational task assignment is handled by Managers.");
+            navigate("/TaskManagement", { replace: true });
+        }
+    }, [role, navigate]);
+
+    // Determine which project data to use based on role (scoped for manager/supervisor)
+    const projectData = (projects?.data?.length > 0 ? projects : allProjects);
 
     const [form, setForm] = useState({
         title: "",

@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { HardHat, Phone, UserCheck, ArrowRightLeft, X, Loader2 } from "lucide-react";
 import {
@@ -10,8 +11,21 @@ import {
   useReassignLabourMutation,
 } from "../Reduxe/Api";
 import { getInitials, getAvatarGradient } from "../helper/avatar";
+import { CheckRole } from "../helper/CheckRole";
+import { getPermissions } from "../helper/permissions";
 
 const AssignLabour = () => {
+  const navigate = useNavigate();
+  const { role } = CheckRole();
+  const permissions = getPermissions(role);
+
+  useEffect(() => {
+    if (permissions.isAdmin) {
+      toast.error("Admins have view & monitoring access only. Labour assignment is an operational task for Managers.");
+      navigate("/LabourDashboard", { replace: true });
+    }
+  }, [permissions.isAdmin, navigate]);
+
   const [projectId, setProjectId] = useState("");
   const [selectedLabours, setSelectedLabours] = useState([]);
   const [reassignLabourId, setReassignLabourId] = useState(null);

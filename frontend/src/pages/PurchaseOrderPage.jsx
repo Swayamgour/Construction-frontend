@@ -40,9 +40,9 @@ const STATUS_STYLES = {
 
 // action -> [mutation trigger name, label, allowed roles, confirm message]
 const ACTIONS = [
-    { to: "SUBMITTED", label: "Submit", roles: ["admin", "manager"] },
+    { to: "SUBMITTED", label: "Submit", roles: ["manager"] },
     { to: "APPROVED", label: "Approve", roles: ["admin"] },
-    { to: "ORDERED", label: "Mark Ordered", roles: ["admin", "manager"] },
+    { to: "ORDERED", label: "Mark Ordered", roles: ["manager"] },
     { to: "CLOSED", label: "Close", roles: ["admin", "manager"] },
     { to: "CANCELLED", label: "Cancel", roles: ["admin", "manager"], danger: true },
 ];
@@ -242,7 +242,7 @@ const PurchaseOrderPage = () => {
                             : "Site purchase orders and vendor supply tracking."}
                     </p>
                 </div>
-                {(currentRole === "admin" || currentRole === "manager") && (
+                {currentRole === "manager" && (
                     <button
                         onClick={() => navigate("/PurchaseOrder")}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm"
@@ -371,7 +371,7 @@ const PurchaseOrderPage = () => {
                                             >
                                                 View
                                             </button>
-                                            {(po.status === "ORDERED" || po.status === "PARTIALLY_RECEIVED") && (
+                                            {currentRole === "manager" && (po.status === "ORDERED" || po.status === "PARTIALLY_RECEIVED") && (
                                                 <button
                                                     onClick={() => navigate(`/stock/operations?tab=receipts&poId=${po._id}`)}
                                                     className="px-2.5 py-1 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 transition-colors"

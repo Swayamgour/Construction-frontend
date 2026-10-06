@@ -23,85 +23,88 @@ const NAV_GROUPS = [
     items: [
       { name: "All Projects", icon: Layers, path: "/Product", roles: ["admin"] },
       { name: "My Projects", icon: Layers, path: "/AssignProject", roles: ["manager", "supervisor"] },
+      { name: "Assign Tasks", icon: ClipboardList, path: "/TaskList", roles: ["manager"] },
+      { name: "Project Delays", icon: AlertTriangle, path: "/project-delays", roles: ["admin", "manager", "supervisor"] },
     ],
   },
   {
-    label: "Labour",
+    label: "Approvals & Control",
     items: [
-      { name: "Labour Manage", icon: Users, path: "/LabourDashboard", roles: ["admin", "manager", "supervisor"] },
+      { name: "Machine Requests", icon: Truck, path: "/machinery/requests", roles: ["admin"] },
+      { name: "Material Requests", icon: ClipboardList, path: "/stock/requests", roles: ["admin"] },
+      { name: "Purchase Orders", icon: Store, path: "/purchase-orders", roles: ["admin"] },
+      { name: "Overtime Requests", icon: Clock, path: "/labour/overtime", roles: ["admin"] },
+      { name: "Attendance Approvals", icon: ClipboardCheck, path: "/labour/pending", roles: ["admin"] },
+      { name: "Employee Attendance", icon: ClipboardList, path: "/employee/pending", roles: ["admin"] },
+    ],
+  },
+  {
+    label: "Labour & Workforce",
+    items: [
+      { name: "Labour Overview", icon: Users, path: "/LabourDashboard", roles: ["admin"] },
+      { name: "Labour Management", icon: Users, path: "/LabourDashboard", roles: ["manager"] },
       { name: "Unassigned Labour", icon: UserX, path: "/labour/unassigned", roles: ["manager"] },
       { name: "Assign Labour", icon: Users, path: "/AssignLabour", roles: ["manager"] },
-
       { name: "Attendance / Workforce", icon: ClipboardList, path: "/attendance/workforce", roles: ["admin"] },
       { name: "Attendance Labour", icon: ClipboardList, path: "/AttendanceLabour", roles: ["manager", "supervisor"] },
-      { name: "Attendance Approvals", icon: ClipboardCheck, path: "/labour/pending", roles: ["admin", "manager"] },
-
-      { name: "Labour Transfer", icon: ArrowRightLeft, path: "/labour/transfer", roles: ["admin", "manager"] },
-      // { name: "Labour Transfer History", icon: History, path: "/labour/full-history", roles: ["admin"] },
-      { name: "Overtime Requests", icon: Clock, path: "/labour/overtime", roles: ["admin"] },
+      { name: "Labour Transfer", icon: ArrowRightLeft, path: "/labour/transfer", roles: ["manager"] },
       { name: "Labour Overtime", icon: Clock, path: "/labour/overtime", roles: ["manager", "supervisor"] },
       { name: "Project Active Labour", icon: Users, path: "/labour/project-active", roles: ["admin", "manager", "supervisor"] },
-      { name: "Labour Full History", icon: History, path: "/labour/full-history", roles: ["admin", "manager", "supervisor"] },
-      // { name: "Labour Reports", icon: BarChart2, path: "/labour/reports", roles: ["admin", "manager", "supervisor"] },
+      { name: "Labour Full History", icon: History, path: "/labour/full-history", roles: ["admin", "manager"] },
       { name: "Overtime Settings", icon: Clock, path: "/labour/overtime-settings", roles: ["admin", "manager"] },
-    ],
-  },
-  {
-    label: "Employees Attendance",
-    items: [
-      { name: "Approve Attendance", icon: ClipboardList, path: "/employee/pending", roles: ["admin"] },
-    ]
-
-  },
-  {
-    label: "Materials & Inventory",
-    items: [
-      { name: "Material Requests", icon: ClipboardList, path: "/stock/requests", roles: ["admin", "manager", "supervisor", "storekeeper"] },
-      { name: "Purchase Orders", icon: Store, path: "/purchase-orders", roles: ["admin"] },
-      { name: "Goods Receipts (GRN)", icon: Boxes, path: "/stock/operations?tab=receipts", roles: ["admin", "manager", "storekeeper", "supervisor"] },
-      { name: "Inventory", icon: Boxes, path: "/stock/operations?tab=inventory", roles: ["admin", "manager", "storekeeper", "supervisor"] },
-      { name: "Transfers", icon: ArrowRightLeft, path: "/stock/operations?tab=transfers", roles: ["admin", "manager", "storekeeper"] },
-      { name: "Material Issues", icon: ClipboardCheck, path: "/stock/operations?tab=issues", roles: ["admin", "manager", "storekeeper", "supervisor"] },
-      { name: "Consumption", icon: Clock, path: "/consumption", roles: ["admin", "manager", "supervisor"] },
-      { name: "Returns", icon: History, path: "/stock/operations?tab=returns", roles: ["admin", "manager", "storekeeper", "supervisor"] },
-      { name: "Adjustments & Damage", icon: AlertTriangle, path: "/stock/operations?tab=adjustments", roles: ["admin", "manager", "storekeeper"] },
-      { name: "Stock Ledger & Reports", icon: BarChart2, path: "/stock/operations?tab=ledger", roles: ["admin", "manager", "storekeeper", "accountant"] },
     ],
   },
   {
     label: "Machinery",
     items: [
-      { name: "Machine Overview", icon: BarChart2, path: "/machine/dashboard", roles: ["admin", "manager", "supervisor"] },
+      { name: "Machine Overview", icon: BarChart2, path: "/machine/dashboard", roles: ["admin", "manager", "supervisor", "operator"] },
       { name: "All Machines", icon: Factory, path: "/machine/list", roles: ["admin"] },
-      { name: "Machine Management", icon: Factory, path: "/machine/list", roles: ["manager", "supervisor"] },
+      { name: "Machine Management", icon: Factory, path: "/machine/list", roles: ["manager"] },
       { name: "Add Machine", icon: Factory, path: "/machine/add", roles: ["manager"] },
-      { name: "Machine Requests", icon: Truck, path: "/machinery/requests", roles: ["admin", "manager", "supervisor"] },
+      { name: "Machine Requests", icon: Truck, path: "/machinery/requests", roles: ["manager", "supervisor"] },
       { name: "Active Deployments", icon: ArrowRightLeft, path: "/assign/active", roles: ["admin"] },
       { name: "Active Assignments", icon: ArrowRightLeft, path: "/assign/active", roles: ["manager", "supervisor"] },
       { name: "Assign Machine", icon: ArrowRightLeft, path: "/assign", roles: ["manager"] },
     ],
   },
   {
-    label: "Vendors & Tasks",
+    label: "Materials & Inventory",
     items: [
-      { name: "Vendor Manage", icon: Store, path: "/VendorManagement", roles: ["admin", "manager"] },
-      { name: "Assign Task", icon: ClipboardList, path: "/TaskList", roles: ["admin", "manager"] },
-      { name: "My Tasks", icon: ClipboardList, path: "/MyTasks", roles: ["admin", "manager", "supervisor", "storekeeper", "drawing_manager"] },
+      { name: "Material Requests", icon: ClipboardList, path: "/stock/requests", roles: ["manager", "supervisor", "storekeeper"] },
+      { name: "Purchase Orders", icon: Store, path: "/purchase-orders", roles: ["manager"] },
+      { name: "Inventory Operations", icon: Boxes, path: "/stock/operations", roles: ["admin", "manager", "storekeeper"] },
+      { name: "Consumption", icon: Clock, path: "/consumption", roles: ["manager", "supervisor"] },
+      { name: "Stock Ledger", icon: BarChart2, path: "/stock/operations?tab=ledger", roles: ["admin", "storekeeper", "accountant"] },
     ],
   },
   {
-    label: "Tracking",
+    label: "Vendors & Tasks",
+    items: [
+      { name: "Vendors Overview", icon: Store, path: "/VendorManagement", roles: ["admin"] },
+      { name: "Vendor Management", icon: Store, path: "/VendorManagement", roles: ["manager"] },
+      { name: "My Tasks", icon: ClipboardList, path: "/MyTasks", roles: ["admin", "manager", "supervisor", "storekeeper", "operator", "labour", "drawing_manager"] },
+    ],
+  },
+  {
+    label: "Site Tracking & Documents",
     items: [
       { name: "Drawings", icon: FileStack, path: "/drawings", roles: ["admin", "manager", "supervisor", "drawing_manager"] },
       { name: "EOD Reports", icon: CalendarCheck, path: "/eod-reports", roles: ["admin", "manager", "supervisor"] },
-      { name: "Project Delays", icon: AlertTriangle, path: "/project-delays", roles: ["admin", "manager", "supervisor"] },
     ],
   },
   {
-    label: "Administration",
+    label: "Self Service & Punch",
     items: [
-      { name: "Create Role", icon: UserPlus, path: "/ViewUser", roles: ["admin"] },
+      { name: "Punch In", icon: Clock, path: "/employee/punch-in", roles: ["operator", "labour"] },
+      { name: "Punch Out", icon: Clock, path: "/employee/punch-out", roles: ["operator", "labour"] },
+    ],
+  },
+  {
+    label: "Reports & Audit",
+    items: [
+      { name: "Reports Hub", icon: BarChart2, path: "/reports-hub", roles: ["admin", "manager"] },
       { name: "Audit Log", icon: ShieldCheck, path: "/audit-log", roles: ["admin"] },
+      { name: "User Roles", icon: UserPlus, path: "/ViewUser", roles: ["admin"] },
     ],
   },
 ];
