@@ -57,7 +57,31 @@ export const listDrawingRequests = async (req, res) => {
             DrawingRequest.countDocuments(filter),
         ]);
 
-        return success(res, 200, "Drawing requests fetched", items, buildPagination(page, limit, total));
+        const requestIds = items.map((i) => i._id);
+        const versions = await DrawingVersion.find({ drawingRequestId: { $in: requestIds } })
+            .sort({ versionNumber: -1 })
+            .lean();
+
+        const latestVersionMap = {};
+        for (const v of versions) {
+            const reqIdStr = String(v.drawingRequestId);
+            if (!latestVersionMap[reqIdStr]) {
+                latestVersionMap[reqIdStr] = v;
+            }
+        }
+
+        const enrichedItems = items.map((item) => {
+            const plain = item.toObject ? item.toObject() : item;
+            const lv = latestVersionMap[String(item._id)] || null;
+            return {
+                ...plain,
+                latestVersion: lv,
+                fileUrl: lv ? lv.fileUrl : null,
+                fileName: lv ? lv.fileName : null,
+            };
+        });
+
+        return success(res, 200, "Drawing requests fetched", enrichedItems, buildPagination(page, limit, total));
     } catch (error) {
         return fail(res, 500, "Error fetching drawing requests", error);
     }

@@ -41,7 +41,7 @@ export const getPermissions = (roleName) => {
     const isAccountant = r === ROLES.ACCOUNTANT;
     const isOperator = r === ROLES.OPERATOR;
     const isLabour = r === ROLES.LABOUR;
-    const isDrawingManager = r === ROLES.DRAWING_MANAGER;
+    const isDrawingManager = r === ROLES.DRAWING_MANAGER || r === "drawing" || r === "drawing_supervisor" || r.includes("drawing");
 
     return {
         role: r,
@@ -184,7 +184,8 @@ export const getPermissions = (roleName) => {
         // ==========================================
         drawing: {
             canView: true,
-            canUpload: isManager || isSupervisor || isDrawingManager,
+            canRequest: isManager || isSupervisor,
+            canUpload: isDrawingManager, // ONLY Drawing role can upload drawings!
             canApprove: isAdmin,
             canReject: isAdmin,
         },

@@ -88,7 +88,7 @@ const NAV_GROUPS = [
   {
     label: "Site Tracking & Documents",
     items: [
-      { name: "Drawings", icon: FileStack, path: "/drawings", roles: ["admin", "manager", "supervisor", "drawing_manager"] },
+      { name: "Drawings", icon: FileStack, path: "/drawings", roles: ["admin", "manager", "supervisor", "drawing_manager", "drawing"] },
       { name: "EOD Reports", icon: CalendarCheck, path: "/eod-reports", roles: ["admin", "manager", "supervisor"] },
     ],
   },
