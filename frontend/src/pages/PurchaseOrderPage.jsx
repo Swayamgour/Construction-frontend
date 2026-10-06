@@ -204,7 +204,7 @@ const PurchaseOrderPage = () => {
         CANCELLED: cancelPO,
     };
 
-    const orders = data?.data || [];
+    const orders = useMemo(() => data?.data || [], [data?.data]);
     const summary = useMemo(() => {
         const counts = orders.reduce((acc, po) => {
             acc[po.status] = (acc[po.status] || 0) + 1;

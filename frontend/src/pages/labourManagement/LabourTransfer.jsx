@@ -54,7 +54,6 @@ const LabourTransfer = () => {
   const [form, setForm] = useState({ labourId: "", projectId: "", toProjectId: "", transferReason: "", remarks: "" });
 
   const isLoading = assigning || transferring || releasing;
-  const navigate = useNavigate();
 
   const [historyLabourId, setHistoryLabourId] = useState(null);
   const { data: historyResp, isFetching: loadingHistory } = useGetLabourAssignmentHistoryQuery(historyLabourId, {

@@ -39,19 +39,27 @@ const PurchaseOrder = () => {
     const { data: itemsData, isLoading: itemsLoading } = useGetAllItemsQuery();
     const [createPurchaseOrder, { isLoading: saving }] = useCreatePurchaseOrderMutation();
 
-    const projects = projectsData?.data || projectsData || [];
-    const projectList = Array.isArray(projects) ? projects : projects?.data || [];
-    const vendors = vendorsData?.data || vendorsData || [];
-    const vendorList = Array.isArray(vendors) ? vendors : vendors?.data || [];
-    const items = itemsData?.data || itemsData || [];
-    const itemList = Array.isArray(items) ? items : items?.data || [];
+    const projectList = useMemo(() => {
+        const raw = projectsData?.data || projectsData || [];
+        return Array.isArray(raw) ? raw : [];
+    }, [projectsData]);
+
+    const vendorList = useMemo(() => {
+        const raw = vendorsData?.data || vendorsData || [];
+        return Array.isArray(raw) ? raw : [];
+    }, [vendorsData]);
+
+    const itemList = useMemo(() => {
+        const raw = itemsData?.data || itemsData || [];
+        return Array.isArray(raw) ? raw : [];
+    }, [itemsData]);
 
     const [projectId, setProjectId] = useState(prefill.prefillProjectId || "");
     const [vendorId, setVendorId] = useState("");
     const [expectedDeliveryDate, setExpectedDeliveryDate] = useState("");
     const [deliveryType, setDeliveryType] = useState("CENTRAL_GODOWN");
     const [deliveryProject, setDeliveryProject] = useState(prefill.prefillProjectId || "");
-    const [stockRequestId, setStockRequestId] = useState(prefill.prefillStockRequestId || "");
+    const stockRequestId = prefill.prefillStockRequestId || "";
     const [materials, setMaterials] = useState(() => {
         if (prefill.prefillItems?.length > 0) {
             return prefill.prefillItems.map((it) => ({

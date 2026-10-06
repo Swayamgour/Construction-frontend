@@ -36,8 +36,6 @@ const LabourForm = ({ labourId, onClose, onSave }) => {
   const [addLabour] = useAddLabourMutation();
   const [updateLabour] = useUpdateLabourMutation();
 
-  const navigate = useNavigate();
-
   const initialState = {
     labourId: "",
     name: "",

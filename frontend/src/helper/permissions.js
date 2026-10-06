@@ -253,4 +253,11 @@ export const getMachinePermissions = (role) => {
     };
 };
 
+export const hasModulePermission = (roleName, moduleName, actionName) => {
+    const p = getPermissions(roleName);
+    if (!p || !p[moduleName]) return false;
+    return Boolean(p[moduleName][actionName]);
+};
+
 export default getPermissions;
+
