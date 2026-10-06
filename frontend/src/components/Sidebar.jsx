@@ -51,7 +51,7 @@ const NAV_GROUPS = [
       { name: "Labour Overtime", icon: Clock, path: "/labour/overtime", roles: ["manager", "supervisor"] },
       { name: "Project Active Labour", icon: Users, path: "/labour/project-active", roles: ["admin", "manager", "supervisor"] },
       { name: "Labour Full History", icon: History, path: "/labour/full-history", roles: ["admin", "manager"] },
-      { name: "Overtime Settings", icon: Clock, path: "/labour/overtime-settings", roles: ["admin", "manager"] },
+      { name: "Overtime Settings", icon: Clock, path: "/labour/overtime-settings", roles: ["admin"] },
     ],
   },
   {
