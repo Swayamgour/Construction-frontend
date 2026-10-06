@@ -703,7 +703,7 @@ const StockRequests = () => {
                           <th className="p-2.5 text-right">In Godown</th>
                           <th className="p-2.5 text-right">Shortage</th>
                           <th className="p-2.5 text-center">Status</th>
-                          {isAdmin && reviewModal.status === "APPROVED" && (
+                          {permissions.stock.canTransfer && reviewModal.status === "APPROVED" && (
                             <th className="p-2.5 text-right">Action</th>
                           )}
                         </tr>
@@ -852,14 +852,36 @@ const StockRequests = () => {
               <form onSubmit={handleTransferSubmit} className="space-y-3.5">
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Source Godown / Project *</label>
-                  <select name="sourceProjectId" className={inputCls} required>
-                    {projects
+                  <select
+                    name="sourceProjectId"
+                    className={inputCls}
+                    required
+                    defaultValue={
+                      projects.find(
+                        (p) =>
+                          (p.isGodown || p.projectType === "Godown" || p.projectCode === "GODOWN-MAIN" || /godown/i.test(p.projectName)) &&
+                          String(p._id) !== String(transferModal.request.projectId?._id || transferModal.request.projectId)
+                      )?._id || ""
+                    }
+                  >
+                    <option value="">-- Select Source Godown / Project --</option>
+                    {[...projects]
                       .filter((p) => String(p._id) !== String(transferModal.request.projectId?._id || transferModal.request.projectId))
-                      .map((p) => (
-                        <option key={p._id} value={p._id}>
-                          {p.projectName} {p.isGodown ? "(Main Godown)" : ""}
-                        </option>
-                      ))}
+                      .sort((a, b) => {
+                        const isAGodown = a.isGodown || a.projectType === "Godown" || a.projectCode === "GODOWN-MAIN" || /godown/i.test(a.projectName);
+                        const isBGodown = b.isGodown || b.projectType === "Godown" || b.projectCode === "GODOWN-MAIN" || /godown/i.test(b.projectName);
+                        if (isAGodown && !isBGodown) return -1;
+                        if (!isAGodown && isBGodown) return 1;
+                        return (a.projectName || "").localeCompare(b.projectName || "");
+                      })
+                      .map((p) => {
+                        const isGodown = p.isGodown || p.projectType === "Godown" || p.projectCode === "GODOWN-MAIN" || /godown/i.test(p.projectName);
+                        return (
+                          <option key={p._id} value={p._id}>
+                            {isGodown ? `🏭 ${p.projectName} (Main Godown)` : `🏗️ ${p.projectName}`}
+                          </option>
+                        );
+                      })}
                   </select>
                 </div>
 

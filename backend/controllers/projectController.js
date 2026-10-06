@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import Project from "../models/Project.js";
 import User from "../models/User.js";
 import { success, getPagination, buildPagination } from "../utils/apiResponse.js";
+import { getOrCreateCentralGodown } from "../services/inventoryService.js";
 
 /**
  * All attachment fields accepted by the Project API.
@@ -254,24 +255,50 @@ export const getAllProjects = async (req, res) => {
         const userId = req.user.id;
         const userRole = req.user.role;
 
+        // Ensure Central Godown project exists
+        try {
+            await getOrCreateCentralGodown();
+        } catch (_) {}
+
         const query = {};
+        const conditions = [];
 
         if (userRole === "manager") {
-            query.managerId = userId;
-        }
-
-        if (userRole === "supervisor") {
-            query.supervisors = userId;
+            conditions.push({
+                $or: [
+                    { managerId: userId },
+                    { isGodown: true },
+                    { projectType: "Godown" },
+                    { projectCode: "GODOWN-MAIN" },
+                    { projectName: /Central Godown/i },
+                ],
+            });
+        } else if (userRole === "supervisor") {
+            conditions.push({
+                $or: [
+                    { supervisors: userId },
+                    { isGodown: true },
+                    { projectType: "Godown" },
+                    { projectCode: "GODOWN-MAIN" },
+                    { projectName: /Central Godown/i },
+                ],
+            });
         }
 
         const { page, limit, skip } = getPagination(req);
         const { search } = req.query;
 
         if (search) {
-            query.$or = [
-                { projectName: { $regex: search, $options: "i" } },
-                { projectCode: { $regex: search, $options: "i" } },
-            ];
+            conditions.push({
+                $or: [
+                    { projectName: { $regex: search, $options: "i" } },
+                    { projectCode: { $regex: search, $options: "i" } },
+                ],
+            });
+        }
+
+        if (conditions.length > 0) {
+            query.$and = conditions;
         }
 
         const [projects, total] = await Promise.all([

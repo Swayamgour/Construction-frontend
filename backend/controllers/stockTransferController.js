@@ -29,11 +29,11 @@ export const createStockTransfer = async (req, res) => {
         if (stockRequestId) {
             request = await StockRequest.findById(stockRequestId);
             if (!request) return fail(res, 404, "Stock request not found");
-            if (!["PENDING_ADMIN_REVIEW", "PARTIALLY_FULFILLED"].includes(request.status)) {
+            if (!["APPROVED", "APPROVED_TRANSFER", "PENDING_ADMIN_REVIEW", "PARTIALLY_FULFILLED"].includes(request.status)) {
                 return fail(res, 400, `Request is already ${request.status}`);
             }
             targetDestId = request.projectId;
-            targetMatId = request.materialId;
+            targetMatId = materialId || request.materialId;
         }
 
         if (!targetDestId || !targetMatId) {
@@ -66,7 +66,7 @@ export const createStockTransfer = async (req, res) => {
                 )
             )[0];
 
-            const refNumber = request ? request.requestNumber : `TRF-${Date.now()}`;
+            const referenceNumber = request ? request.requestNumber : `TRF-${Date.now()}`;
 
             const debit = await applyStockMovement({
                 projectId: sourceProjectId,
@@ -75,7 +75,7 @@ export const createStockTransfer = async (req, res) => {
                 transactionType: "TRANSFER_OUT",
                 referenceId: transfer._id,
                 referenceNumber,
-                remarks: `Transfer out to fulfil ${refNumber}`,
+                remarks: `Transfer out to fulfil ${referenceNumber}`,
                 session,
             });
 
@@ -86,7 +86,7 @@ export const createStockTransfer = async (req, res) => {
                 transactionType: "TRANSFER_IN",
                 referenceId: transfer._id,
                 referenceNumber,
-                remarks: `Transfer in fulfilling ${refNumber}`,
+                remarks: `Transfer in fulfilling ${referenceNumber}`,
                 session,
             });
 
